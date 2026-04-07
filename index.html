@@ -1,0 +1,3672 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>OZ - 経営ダッシュボード × バーチャルワールド</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#e8f4f8;font-family:'Noto Sans JP',sans-serif;color:#1a1a2e;-webkit-tap-highlight-color:transparent;user-select:none}
+canvas{display:block}
+
+/* ===== LOADING ===== */
+#loading{position:fixed;inset:0;z-index:1000;background:#e8f4f8;display:flex;align-items:center;justify-content:center;flex-direction:column;transition:opacity 1s}
+#loading .spinner{width:40px;height:40px;border:3px solid rgba(67,56,202,0.15);border-top-color:#4338ca;border-radius:50%;animation:spin 0.8s linear infinite}
+#loading p{margin-top:16px;font-size:14px;color:#4338ca;letter-spacing:2px;font-weight:700}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ===== INTRO ===== */
+#intro{position:fixed;inset:0;z-index:100;background:linear-gradient(135deg,#1e1b4b,#312e81,#1e1b4b);display:flex;align-items:center;justify-content:center;flex-direction:column;cursor:pointer;transition:opacity 1.5s}
+#intro-canvas{position:absolute;inset:0;width:100%;height:100%}
+#intro-text{position:relative;z-index:2;text-align:center;opacity:0;transition:opacity 2s}
+#intro-text h1{font-family:'Noto Sans JP',sans-serif;font-size:min(20vw,160px);font-weight:900;letter-spacing:0.15em;background:linear-gradient(135deg,#818cf8,#c084fc,#fbbf24,#818cf8);background-size:300% 300%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;animation:gradientShift 4s ease infinite;filter:drop-shadow(0 0 60px rgba(129,140,248,0.6))}
+@keyframes gradientShift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+#intro-text .subtitle{font-size:14px;letter-spacing:6px;color:rgba(199,210,254,0.7);margin-top:8px}
+#tap-enter{position:absolute;bottom:15%;left:50%;transform:translateX(-50%);z-index:2;font-size:16px;letter-spacing:4px;color:rgba(199,210,254,0.8);opacity:0;animation:blink 2s ease-in-out infinite;transition:opacity 1s;font-weight:700}
+@keyframes blink{0%,100%{opacity:0.3}50%{opacity:1}}
+
+/* ===== TOP BAR ===== */
+#top-bar{position:fixed;top:0;left:0;right:0;height:52px;z-index:20;background:rgba(30,27,75,0.95);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:flex;align-items:center;padding:0 20px;gap:24px;border-bottom:1px solid rgba(129,140,248,0.2);font-size:13px;color:#e0e7ff;opacity:0;transition:opacity 0.8s}
+#top-bar.visible{opacity:1}
+#top-bar .bar-logo{font-weight:900;font-size:20px;letter-spacing:0.1em;background:linear-gradient(135deg,#818cf8,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-right:8px;flex-shrink:0}
+#top-bar .bar-section{display:flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(129,140,248,0.08);border-radius:8px;border:1px solid rgba(129,140,248,0.15);white-space:nowrap;flex-shrink:0}
+#top-bar .bar-section .bar-icon{font-size:16px}
+#top-bar .bar-section .bar-label{color:rgba(199,210,254,0.6);font-size:11px;font-weight:500}
+#top-bar .bar-section .bar-value{color:#e0e7ff;font-weight:700;font-size:12px}
+#top-bar .bar-divider{width:1px;height:28px;background:rgba(129,140,248,0.2);flex-shrink:0}
+#top-bar .bar-clock{margin-left:auto;font-weight:700;font-size:14px;color:#a5b4fc;letter-spacing:1px;flex-shrink:0}
+#top-bar .bar-urgent{display:flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(239,68,68,0.12);border-radius:8px;border:1px solid rgba(239,68,68,0.3);white-space:nowrap;flex-shrink:0}
+#top-bar .bar-urgent .urgent-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:6px;font-size:11px;font-weight:700;color:#fca5a5;animation:urgentPulse 2s ease-in-out infinite}
+@keyframes urgentPulse{0%,100%{opacity:0.8}50%{opacity:1}}
+
+/* ===== MAIN AREA ===== */
+#game-area{position:fixed;top:52px;left:0;right:250px;bottom:0}
+
+/* ===== RIGHT PANEL ===== */
+#right-panel{position:fixed;top:52px;right:0;bottom:0;width:250px;z-index:15;background:rgba(255,255,255,0.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-left:1px solid rgba(67,56,202,0.12);padding:16px;overflow-y:auto;opacity:0;transition:opacity 0.8s;font-size:12px}
+#right-panel.visible{opacity:1}
+#right-panel .panel-title{font-weight:900;font-size:14px;color:#312e81;letter-spacing:1px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #e0e7ff}
+#right-panel .agent-card{background:rgba(238,242,255,0.8);border:1px solid rgba(99,102,241,0.12);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+#right-panel .agent-card .agent-header{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+#right-panel .agent-card .agent-icon{font-size:18px}
+#right-panel .agent-card .agent-name{font-weight:700;font-size:13px;color:#1e1b4b}
+#right-panel .agent-card .agent-badge{display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-left:auto}
+.badge-active{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
+.badge-monitoring{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
+.badge-standby{background:#e0e7ff;color:#3730a3;border:1px solid #c7d2fe}
+#right-panel .agent-card .agent-detail{color:#64748b;font-size:11px;line-height:1.6;margin-top:2px}
+#right-panel .panel-footer{color:#94a3b8;font-size:10px;margin-top:12px;padding-top:8px;border-top:1px solid #e2e8f0}
+
+/* ===== BOTTOM CONTROLS ===== */
+#controls-hint{position:fixed;bottom:12px;left:12px;z-index:18;font-size:11px;color:#64748b;pointer-events:none;opacity:0;transition:opacity 0.8s}
+#controls-hint.visible{opacity:1}
+#controls-hint span{display:inline-block;padding:2px 8px;border:1px solid #cbd5e1;border-radius:4px;margin:0 2px;font-size:10px;color:#475569;background:rgba(255,255,255,0.8);font-weight:700}
+
+/* ===== MINIMAP ===== */
+#minimap-container{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:18;background:rgba(255,255,255,0.9);border:1px solid rgba(67,56,202,0.15);border-radius:10px;padding:6px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:0 2px 12px rgba(0,0,0,0.08);opacity:0;transition:opacity 0.8s}
+#minimap-container.visible{opacity:1}
+#minimap{width:180px;height:120px;display:block;image-rendering:pixelated}
+
+/* ===== DETAIL PANEL (Slide-in) ===== */
+#detail-overlay{position:fixed;inset:0;z-index:25;background:rgba(0,0,0,0.3);opacity:0;pointer-events:none;transition:opacity 0.3s}
+#detail-overlay.open{opacity:1;pointer-events:auto}
+#detail-panel{position:fixed;top:52px;right:250px;bottom:0;width:420px;background:rgba(255,255,255,0.97);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-left:1px solid rgba(67,56,202,0.1);padding:28px 24px;overflow-y:auto;z-index:26;transform:translateX(100%);transition:transform 0.4s cubic-bezier(0.16,1,0.3,1);box-shadow:-4px 0 24px rgba(0,0,0,0.08)}
+#detail-panel.open{transform:translateX(0)}
+#detail-panel .panel-close{position:absolute;top:16px;right:16px;width:32px;height:32px;border:none;background:#f1f5f9;border-radius:50%;color:#475569;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.2s}
+#detail-panel .panel-close:hover{background:#e0e7ff;color:#4338ca}
+#detail-panel .panel-icon{font-size:44px;margin-bottom:4px}
+#detail-panel .panel-title{font-size:22px;font-weight:900;color:#1e1b4b;margin-bottom:4px}
+#detail-panel .panel-desc{font-size:13px;color:#64748b;margin-bottom:12px}
+#detail-panel .panel-status{display:inline-block;padding:4px 14px;border-radius:20px;font-size:11px;font-weight:700;margin-bottom:16px}
+.status-active{background:#dcfce7;color:#166534;border:1px solid #bbf7d0}
+.status-stalled{background:#fef3c7;color:#92400e;border:1px solid #fde68a}
+.status-blocked{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+#detail-panel .progress-section{margin-bottom:16px}
+#detail-panel .progress-label{font-size:11px;color:#94a3b8;font-weight:700;margin-bottom:4px;display:flex;justify-content:space-between}
+#detail-panel .progress-bar{height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden}
+#detail-panel .progress-fill{height:100%;border-radius:3px;transition:width 1s cubic-bezier(0.16,1,0.3,1)}
+#detail-panel .info-section{margin-bottom:16px}
+#detail-panel .info-title{font-size:11px;color:#4338ca;font-weight:700;letter-spacing:1px;margin-bottom:6px}
+#detail-panel .info-item{font-size:13px;color:#475569;padding:5px 0;border-bottom:1px solid #f1f5f9;line-height:1.5}
+#detail-panel .info-item:last-child{border-bottom:none}
+#detail-panel .members{display:flex;gap:6px;flex-wrap:wrap}
+#detail-panel .member{display:flex;align-items:center;gap:4px;padding:3px 10px;background:#eef2ff;border:1px solid #e0e7ff;border-radius:16px;font-size:12px;color:#3730a3;font-weight:500}
+#detail-panel .member-dot{width:6px;height:6px;border-radius:50%;background:#4338ca}
+
+/* ===== PROXIMITY POPUP ===== */
+#proximity-popup{position:fixed;bottom:60px;left:50%;transform:translateX(-50%) translateX(-125px);z-index:19;background:rgba(255,255,255,0.95);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(67,56,202,0.15);border-radius:12px;padding:12px 20px;min-width:260px;box-shadow:0 4px 20px rgba(0,0,0,0.1);opacity:0;transition:opacity 0.3s,transform 0.3s;pointer-events:none;text-align:center}
+#proximity-popup.visible{opacity:1;pointer-events:auto}
+#proximity-popup .popup-icon{font-size:28px}
+#proximity-popup .popup-name{font-size:16px;font-weight:900;color:#1e1b4b;margin-top:2px}
+#proximity-popup .popup-status{font-size:12px;color:#64748b;margin-top:2px}
+#proximity-popup .popup-hint{font-size:10px;color:#a5b4fc;margin-top:6px;font-weight:700}
+
+/* ===== NOTIFICATION ===== */
+#notification{position:fixed;top:60px;left:50%;transform:translateX(-50%) translateX(-125px);z-index:50;background:rgba(255,255,255,0.95);backdrop-filter:blur(8px);border:1px solid rgba(67,56,202,0.15);border-radius:10px;padding:10px 24px;font-size:14px;font-weight:700;color:#1e1b4b;opacity:0;transition:opacity 0.4s;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.08)}
+
+/* ===== FPS CROSSHAIR ===== */
+#crosshair{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) translateX(-125px);z-index:12;pointer-events:none;opacity:0;transition:opacity 0.4s}
+#crosshair::before,#crosshair::after{content:'';position:absolute;background:rgba(67,56,202,0.5)}
+#crosshair::before{width:16px;height:2px;top:50%;left:50%;transform:translate(-50%,-50%)}
+#crosshair::after{width:2px;height:16px;top:50%;left:50%;transform:translate(-50%,-50%)}
+#crosshair.visible{opacity:1}
+
+/* ===== VIEW MODE ===== */
+#view-mode{position:fixed;bottom:60px;left:12px;font-size:11px;color:#64748b;pointer-events:none;z-index:18;line-height:1.8;opacity:0;transition:opacity 0.8s}
+#view-mode.visible{opacity:1}
+#view-mode .mode-label{color:#4338ca;font-weight:900}
+
+/* ===== MOBILE ===== */
+#mobile-pad{display:none;position:fixed;bottom:40px;left:40px;z-index:15;pointer-events:auto}
+#mobile-interact{display:none;position:fixed;bottom:50px;right:290px;z-index:15;width:56px;height:56px;border-radius:50%;border:2px solid #4338ca;background:rgba(99,102,241,0.1);color:#4338ca;font-size:11px;font-weight:900;cursor:pointer;pointer-events:auto;backdrop-filter:blur(5px);align-items:center;justify-content:center}
+
+/* ===== RESPONSIVE ===== */
+@media(max-width:768px){
+  #right-panel{display:none}
+  #game-area{right:0}
+  #detail-panel{right:0;width:100%;top:auto;bottom:0;max-height:55vh;border-radius:16px 16px 0 0;transform:translateY(100%)}
+  #detail-panel.open{transform:translateY(0)}
+  #top-bar{font-size:11px;gap:8px;padding:0 8px;height:44px}
+  #top-bar .bar-section{padding:4px 8px;font-size:10px}
+  #controls-hint{display:none}
+  #mobile-pad{display:block}
+  #mobile-interact{display:flex;right:40px}
+  #proximity-popup{transform:translateX(-50%)}
+  #notification{transform:translateX(-50%)}
+  #crosshair{transform:translate(-50%,-50%)}
+  #minimap-container{bottom:10px;transform:translateX(-50%) scale(0.8)}
+}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner"></div>
+  <p>OZ LOADING</p>
+</div>
+
+<!-- Intro -->
+<div id="intro" style="display:none">
+  <canvas id="intro-canvas"></canvas>
+  <div id="intro-text">
+    <h1>OZ</h1>
+    <div class="subtitle">経営ダッシュボード × バーチャルワールド</div>
+  </div>
+  <div id="tap-enter">TAP TO ENTER</div>
+</div>
+
+<!-- Top Bar -->
+<div id="top-bar">
+  <div class="bar-logo">OZ</div>
+  <div class="bar-section">
+    <span class="bar-icon">💰</span>
+    <div>
+      <div class="bar-label">キャッシュ</div>
+      <div class="bar-value">Trading AI +$1,084 | Aplz ¥0/月 | CW: 準備中</div>
+    </div>
+  </div>
+  <div class="bar-divider"></div>
+  <div class="bar-section">
+    <span class="bar-icon">📅</span>
+    <div>
+      <div class="bar-label">今日</div>
+      <div class="bar-value" id="schedule-value">4/6 東京会議収録 | 4/3 ExNerve MTG</div>
+    </div>
+  </div>
+  <div class="bar-divider"></div>
+  <div class="bar-section">
+    <span class="bar-icon">🤖</span>
+    <div>
+      <div class="bar-label">エージェント</div>
+      <div class="bar-value">hitomi稼働中 | Trading監視中</div>
+    </div>
+  </div>
+  <div class="bar-divider"></div>
+  <div class="bar-urgent" id="urgent-tasks">
+    <span class="urgent-badge">⚠️ GitHub 2FA (4/15期限)</span>
+    <span class="urgent-badge">📋 東京会議準備 (4/6)</span>
+  </div>
+  <div class="bar-clock" id="bar-clock">00:00:00</div>
+</div>
+
+<!-- Right Panel - Agent State -->
+<div id="right-panel">
+  <div class="panel-title">🤖 エージェント状態</div>
+  <div id="agent-cards">
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-icon">👁️</span>
+        <span class="agent-name">hitomi</span>
+        <span class="agent-badge badge-active">稼働中</span>
+      </div>
+      <div class="agent-detail">稼働中 ✅ — 最終動作：<span id="hitomi-last">5分前</span></div>
+      <div id="hitomi-browser-status" style="margin-top:6px;padding:6px 8px;background:rgba(99,102,241,0.08);border-radius:6px;font-size:10px;display:none">
+        <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px">
+          <span style="width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;animation:pulse 1.5s infinite"></span>
+          <span style="font-weight:700;color:#4f46e5">ブラウザ稼働中</span>
+          <span id="hitomi-browser-site" style="margin-left:auto;color:#64748b"></span>
+        </div>
+        <div id="hitomi-browser-action" style="color:#1e1b4b;font-weight:600">待機中</div>
+        <div id="hitomi-browser-url" style="color:#64748b;word-break:break-all;margin-top:2px"></div>
+        <div style="margin-top:4px;background:rgba(99,102,241,0.1);border-radius:3px;height:4px">
+          <div id="hitomi-browser-progress" style="height:100%;background:#4f46e5;border-radius:3px;transition:width 0.5s;width:0%"></div>
+        </div>
+      </div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-icon">📈</span>
+        <span class="agent-name">TradingEngineer</span>
+        <span class="agent-badge badge-monitoring">EDGAR監視中</span>
+      </div>
+      <div class="agent-detail">EDGAR監視中 📊 — 損益: +$1,084</div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-icon">💻</span>
+        <span class="agent-name">Claude Code</span>
+        <span class="agent-badge badge-active">OZ開発中</span>
+      </div>
+      <div class="agent-detail">OZ ダッシュボード開発中 💻</div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-header">
+        <span class="agent-icon">🔍</span>
+        <span class="agent-name">CWモニター</span>
+        <span class="agent-badge badge-monitoring">起動中</span>
+      </div>
+      <div class="agent-detail">CryptoWatch監視 起動中 🔍</div>
+    </div>
+  </div>
+  <div class="panel-footer">🔄 最終更新: <span id="agent-update-time">--:--</span></div>
+  <!-- Upworkライブパネル -->
+  <div style="margin-top:14px;padding-top:10px;border-top:2px solid #e0e7ff">
+    <div style="font-weight:900;font-size:13px;color:#f97316;letter-spacing:1px;margin-bottom:8px">🥔 OIMO FARM — Upwork</div>
+    <div id="live-upwork-panel" style="color:#64748b;font-size:11px">読み込み中...</div>
+  </div>
+</div>
+
+<!-- Controls Hint -->
+<div id="controls-hint">
+  <span title="奥へ">↑W: 奥</span>
+  <span title="手前へ">↓S: 手前</span>
+  <span title="左へ">←A: 左</span>
+  <span title="右へ">→D: 右</span> &nbsp;
+  <span>Enter</span> 詳細 &nbsp;
+  <span>V</span> 視点切替 &nbsp;
+  <span>Scroll</span> ズーム &nbsp;
+  <span>Esc</span> 閉じる
+</div>
+
+<div id="game-area"></div>
+
+<!-- Minimap -->
+<div id="minimap-container">
+  <canvas id="minimap" width="180" height="120"></canvas>
+</div>
+
+<!-- Detail Panel (Slide-in) -->
+<div id="detail-overlay"></div>
+
+<!-- hitomi全画面オーバーレイ -->
+<div id="hitomi-fullscreen" style="
+  display:none; position:fixed; inset:0; z-index:100;
+  background:rgba(5,5,20,0.97); backdrop-filter:blur(20px);
+  animation:hitomi-open 0.35s cubic-bezier(0.16,1,0.3,1);
+">
+  <style>
+    @keyframes hitomi-open {
+      from { opacity:0; transform:scale(0.92); }
+      to   { opacity:1; transform:scale(1); }
+    }
+    .hf-tab { padding:8px 18px; border:none; background:transparent; color:#64748b;
+              font-size:13px; font-weight:700; cursor:pointer; border-bottom:2px solid transparent;
+              font-family:monospace; letter-spacing:1px; transition:all 0.2s; }
+    .hf-tab.active { color:#a5b4fc; border-bottom-color:#6366f1; }
+    .hf-tab:hover { color:#e2e8f0; }
+  </style>
+  <!-- ヘッダー -->
+  <div style="display:flex;align-items:center;padding:12px 24px;border-bottom:1px solid rgba(99,102,241,0.2)">
+    <span style="font-size:20px;margin-right:10px">👁️</span>
+    <span style="color:#fff;font-weight:900;font-size:16px;letter-spacing:2px">HITOMI WORK — 指令室</span>
+    <div style="margin-left:24px;display:flex;gap:4px">
+      <button class="hf-tab active" onclick="hitomiShowTab('cash')">CASH PLAN</button>
+      <button class="hf-tab" onclick="hitomiShowTab('jobs')">UPWORK案件</button>
+      <button class="hf-tab" onclick="hitomiShowTab('arch')">AIアーキテクチャ</button>
+      <button class="hf-tab" onclick="hitomiShowTab('browser')">LIVEブラウザ</button>
+    </div>
+    <button onclick="closeHitomiFullscreen()" style="margin-left:auto;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);color:#94a3b8;border-radius:8px;padding:6px 14px;cursor:pointer;font-size:13px">ESC 閉じる</button>
+  </div>
+  <!-- コンテンツエリア -->
+  <div id="hf-content" style="padding:24px;height:calc(100vh - 62px);overflow-y:auto;color:#e2e8f0;font-family:monospace"></div>
+</div>
+<div id="detail-panel">
+  <button class="panel-close" id="panel-close">&times;</button>
+  <div class="panel-icon" id="panel-icon"></div>
+  <div class="panel-title" id="panel-title"></div>
+  <div class="panel-desc" id="panel-desc"></div>
+  <div class="panel-status" id="panel-status"></div>
+  <div class="progress-section">
+    <div class="progress-label"><span>進捗</span><span id="progress-pct">0%</span></div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  </div>
+  <div class="info-section">
+    <div class="info-title">最近のアクティビティ</div>
+    <div id="panel-recent"></div>
+  </div>
+  <div class="info-section">
+    <div class="info-title">次のタスク</div>
+    <div id="panel-next"></div>
+  </div>
+  <div class="info-section">
+    <div class="info-title">チームメンバー</div>
+    <div class="members" id="panel-members"></div>
+  </div>
+</div>
+
+<!-- Proximity Popup -->
+<div id="proximity-popup">
+  <div class="popup-icon" id="popup-icon"></div>
+  <div class="popup-name" id="popup-name"></div>
+  <div class="popup-status" id="popup-status"></div>
+  <div class="popup-hint">Enterで詳細を表示</div>
+</div>
+
+<!-- Notification -->
+<div id="notification"></div>
+
+<!-- FPS Crosshair -->
+<div id="crosshair"></div>
+
+<!-- View Mode -->
+<div id="view-mode"></div>
+
+<!-- Mobile Controls -->
+<div id="mobile-pad">
+  <svg width="120" height="120" viewBox="0 0 120 120">
+    <circle cx="60" cy="60" r="56" fill="rgba(99,102,241,0.05)" stroke="rgba(99,102,241,0.2)" stroke-width="1"/>
+    <circle id="pad-knob" cx="60" cy="60" r="20" fill="rgba(99,102,241,0.15)" stroke="rgba(99,102,241,0.3)" stroke-width="1"/>
+  </svg>
+</div>
+<button id="mobile-interact">GO</button>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.158.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.158.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+
+// ============================================================
+// CONSTANTS & PROJECT DATA
+// ============================================================
+
+const IS_MOBILE = /Android|iPhone|iPad|iPod|webOS/i.test(navigator.userAgent) || window.innerWidth < 768;
+
+const PROJECTS = [
+  {
+    id: 'trade', name: 'TRADING', nameJP: '自動売買システム', icon: '💰', status: 'active', progress: 70,
+    color: new THREE.Color(0xd4a017), glowColor: 0xffd700,
+    statusBadge: '🟢', statusLine: '+$1,084 | 監視中',
+    description: '自動売買システム — EDGAR監視 & Alpaca取引',
+    recent: ['バックテスト完了', 'リスク管理モジュールv3', '本日損益: +$1,084'],
+    next: ['パフォーマンス最適化', '新シグナル追加', '月次レポート'],
+    members: ['Joe', 'TradingEngineer', 'Sam'],
+    position: new THREE.Vector3(45, 0, 25)
+  },
+  {
+    id: 'oimo', name: 'OIMO FARM', nameJP: 'Upwork収益島', icon: '🥔', status: 'active', progress: 20,
+    color: new THREE.Color(0xf97316), glowColor: 0xfb923c,
+    statusBadge: '🟠', statusLine: 'Upwork自動収益化',
+    description: 'OIMO FARM — Upwork自動応募・収益化',
+    recent: ['自動応募システム稼働', 'プロフィール設定完了', '案件スクリーニング中'],
+    next: ['初案件獲得', 'Connectsチャージ', '$25/hr達成'],
+    members: ['hitomi', 'Joe'],
+    position: new THREE.Vector3(35, 0, -35)
+  },
+  {
+    id: 'hitomi-work', name: 'HITOMI', nameJP: 'AIエージェント司令塔', icon: '👁️', status: 'active', progress: 100,
+    color: new THREE.Color(0x6366f1), glowColor: 0xa855f7,
+    statusBadge: '🟢', statusLine: '24時間稼働中',
+    description: 'hitomi AIエージェント — 自律作業ゾーン',
+    recent: ['Upworkプロフィール設定中', 'Slack監視中', 'OS制御ブラウザ稼働中'],
+    next: ['案件獲得→収益化', 'LINE/Slack統合強化', 'フィジカル制御拡張'],
+    members: ['hitomi', 'subagent'],
+    position: new THREE.Vector3(-45, 0, -20)
+  },
+  {
+    id: 'home', name: 'HOME BASE', nameJP: '司令部', icon: '🏠', status: 'active', progress: 100,
+    color: new THREE.Color(0x6366f1), glowColor: 0x6366f1,
+    statusBadge: '🟢', statusLine: '全プロジェクト管理',
+    description: "Joeの司令部 — 中央コマンドセンター",
+    recent: ['週次同期完了', 'Q2ロードマップ確定', '新メンバー参加'],
+    next: ['月次レビュー準備', 'Q3予算配分', 'チームビルディング'],
+    members: ['Joe', '全チーム'],
+    position: new THREE.Vector3(0, 0, 0)
+  }
+];
+
+// ============================================================
+// AUDIO ENGINE
+// ============================================================
+
+class AudioEngine {
+  constructor() { this.ctx = null; this.master = null; this.started = false; this.nodes = []; }
+
+  async init() {
+    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    this.master = this.ctx.createGain();
+    this.master.gain.value = 0;
+    this.master.connect(this.ctx.destination);
+    this.reverb = this.ctx.createGain();
+    this.reverb.gain.value = 0.3;
+    const delay1 = this.ctx.createDelay(1); delay1.delayTime.value = 0.15;
+    const delay2 = this.ctx.createDelay(1); delay2.delayTime.value = 0.3;
+    const fb = this.ctx.createGain(); fb.gain.value = 0.35;
+    const lpf = this.ctx.createBiquadFilter(); lpf.type = 'lowpass'; lpf.frequency.value = 2500;
+    this.reverb.connect(delay1); delay1.connect(lpf); lpf.connect(fb); fb.connect(delay1);
+    delay1.connect(this.master); this.reverb.connect(delay2); delay2.connect(this.master);
+  }
+
+  fadeIn(duration = 3) {
+    if (!this.ctx) return;
+    this.master.gain.cancelScheduledValues(this.ctx.currentTime);
+    this.master.gain.setValueAtTime(this.master.gain.value, this.ctx.currentTime);
+    this.master.gain.linearRampToValueAtTime(0.3, this.ctx.currentTime + duration);
+  }
+
+  fadeOut(duration = 2) {
+    if (!this.ctx) return;
+    this.master.gain.cancelScheduledValues(this.ctx.currentTime);
+    this.master.gain.setValueAtTime(this.master.gain.value, this.ctx.currentTime);
+    this.master.gain.linearRampToValueAtTime(0, this.ctx.currentTime + duration);
+  }
+
+  startBGM() {
+    if (this.started || !this.ctx) return;
+    this.started = true;
+    const drone1 = this.ctx.createOscillator(); drone1.type = 'sine'; drone1.frequency.value = 65;
+    const drone1g = this.ctx.createGain(); drone1g.gain.value = 0.06;
+    drone1.connect(drone1g); drone1g.connect(this.master); drone1g.connect(this.reverb); drone1.start(); this.nodes.push(drone1);
+    [130, 195.99, 261.63].forEach(freq => {
+      const osc = this.ctx.createOscillator(); osc.type = 'sine'; osc.frequency.value = freq;
+      const g = this.ctx.createGain(); g.gain.value = 0.02;
+      const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 800;
+      osc.connect(f); f.connect(g); g.connect(this.master); g.connect(this.reverb); osc.start(); this.nodes.push(osc);
+    });
+    this.startShimmer();
+  }
+
+  startShimmer() {
+    const pentatonic = [523.25, 659.25, 783.99, 880, 1046.5];
+    const playNote = () => {
+      if (!this.ctx || this.ctx.state === 'closed') return;
+      const freq = pentatonic[Math.floor(Math.random() * pentatonic.length)];
+      const osc = this.ctx.createOscillator(); osc.type = 'sine'; osc.frequency.value = freq;
+      const g = this.ctx.createGain(); const now = this.ctx.currentTime;
+      g.gain.setValueAtTime(0, now);
+      g.gain.linearRampToValueAtTime(0.02 + Math.random() * 0.015, now + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 1.5 + Math.random());
+      osc.connect(g); g.connect(this.master); g.connect(this.reverb);
+      osc.start(now); osc.stop(now + 2.5);
+      setTimeout(playNote, 1500 + Math.random() * 3000);
+    };
+    setTimeout(playNote, 1000);
+  }
+
+  playChime(freq = 880) {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator(); osc.type = 'sine'; osc.frequency.value = freq;
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(0.08, now + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+    osc.connect(g); g.connect(this.master); g.connect(this.reverb);
+    osc.start(now); osc.stop(now + 0.8);
+  }
+
+  playUIOpen() { if (!this.ctx) return; [523.25, 659.25, 783.99].forEach((f, i) => setTimeout(() => this.playChime(f), i * 80)); }
+  playUIClose() { if (!this.ctx) return; [783.99, 659.25, 523.25].forEach((f, i) => setTimeout(() => this.playChime(f), i * 60)); }
+}
+
+// ============================================================
+// INTRO SEQUENCE
+// ============================================================
+
+class IntroSequence {
+  constructor(canvas) { this.canvas = canvas; this.c = canvas.getContext('2d'); this.particles = []; this.phase = 0; this.time = 0; this.textPositions = []; this.done = false; }
+
+  resize() {
+    const dpr = Math.min(window.devicePixelRatio, 2);
+    this.canvas.width = window.innerWidth * dpr; this.canvas.height = window.innerHeight * dpr;
+    this.c.scale(dpr, dpr); this.w = window.innerWidth; this.h = window.innerHeight;
+  }
+
+  init() {
+    this.resize(); this.sampleText();
+    const count = IS_MOBILE ? 300 : 600;
+    for (let i = 0; i < count; i++) {
+      const target = this.textPositions[i % this.textPositions.length];
+      this.particles.push({
+        x: Math.random() * this.w, y: Math.random() * this.h,
+        tx: target ? target.x : this.w / 2, ty: target ? target.y : this.h / 2,
+        size: Math.random() * 2.5 + 0.5, speed: 0.01 + Math.random() * 0.02,
+        brightness: Math.random(), hue: Math.random() < 0.33 ? 240 : Math.random() < 0.5 ? 270 : 45,
+        gathered: false
+      });
+    }
+    this.animate();
+    setTimeout(() => { this.phase = 1; }, 3000);
+    setTimeout(() => { this.phase = 2; }, 5000);
+  }
+
+  sampleText() {
+    const c = document.createElement('canvas'); const ctx = c.getContext('2d');
+    const size = Math.min(this.w * 0.35, 200);
+    c.width = this.w; c.height = this.h;
+    ctx.fillStyle = '#fff';
+    ctx.font = `900 ${size}px "Noto Sans JP", sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('OZ', this.w / 2, this.h / 2);
+    const imageData = ctx.getImageData(0, 0, this.w, this.h);
+    const positions = []; const step = IS_MOBILE ? 5 : 3;
+    for (let y = 0; y < this.h; y += step) {
+      for (let x = 0; x < this.w; x += step) {
+        const i = (y * this.w + x) * 4;
+        if (imageData.data[i + 3] > 128) positions.push({ x, y });
+      }
+    }
+    this.textPositions = positions;
+  }
+
+  animate() {
+    if (this.done) return;
+    requestAnimationFrame(() => this.animate());
+    this.time += 0.016;
+    const c = this.c;
+    c.clearRect(0, 0, this.w, this.h);
+    // Dark indigo gradient background
+    const grad = c.createLinearGradient(0, 0, this.w, this.h);
+    grad.addColorStop(0, '#1e1b4b'); grad.addColorStop(0.5, '#312e81'); grad.addColorStop(1, '#1e1b4b');
+    c.fillStyle = grad; c.fillRect(0, 0, this.w, this.h);
+    const gatherStrength = this.phase >= 1 ? 1 : Math.min(1, this.time / 3);
+    for (const p of this.particles) {
+      const dx = p.tx - p.x; const dy = p.ty - p.y;
+      if (this.phase < 2) { p.x += dx * p.speed * gatherStrength; p.y += dy * p.speed * gatherStrength; if (Math.sqrt(dx*dx+dy*dy) < 2) p.gathered = true; }
+      const shimmer = 0.5 + 0.5 * Math.sin(this.time * 2 + p.brightness * 6);
+      const alpha = p.gathered ? 0.8 + shimmer * 0.2 : 0.3 + shimmer * 0.4;
+      const size = p.gathered ? p.size * (1 + shimmer * 0.3) : p.size;
+      c.beginPath(); c.arc(p.x, p.y, size, 0, Math.PI * 2);
+      c.fillStyle = `hsla(${p.hue}, 80%, ${60 + shimmer * 20}%, ${alpha})`; c.fill();
+    }
+  }
+
+  destroy() { this.done = true; }
+}
+
+// ============================================================
+// MAIN GAME
+// ============================================================
+
+class OZGame {
+  constructor() {
+    this.clock = new THREE.Clock(); this.audio = new AudioEngine();
+    this.islands = []; this.islandMeshes = []; this.character = null;
+    this.charVelocity = new THREE.Vector3(); this.charTarget = null;
+    this.keys = {}; this.nearIsland = null; this.panelOpen = false;
+    this.currentProject = null; this.gameStarted = false; this.introSeq = null;
+    this.ambientParticles = null;
+    this.bridgeLines = []; this.labelSprites = [];
+    this.cameraOffset = new THREE.Vector3(0, 65, 55);
+    this.cameraLookOffset = new THREE.Vector3(0, 0, -5);
+    this.smoothCamPos = new THREE.Vector3();
+    this.smoothCamTarget = new THREE.Vector3();
+    this.mobileDir = new THREE.Vector2(0, 0);
+    this.touchStartPos = null;
+    this.isMoving = false;
+    this.walkPhase = 0;
+    this.zoomLevel = 1;
+    this.fpsMode = false;
+    this.fpsYaw = 0;
+    this.fpsPitch = 0;
+    this.fpsDragging = false;
+    this.fpsDragStart = { x: 0, y: 0 };
+    this.cameraTransition = 0;
+    this.cameraTransitionDuration = 1.0;
+    this.cameraTransitionFrom = new THREE.Vector3();
+    this.cameraTransitionTo = new THREE.Vector3();
+    this.cameraTransitionLookFrom = new THREE.Vector3();
+    this.cameraTransitionLookTo = new THREE.Vector3();
+    this.agentCharacters = [];
+    this.lastProximityIsland = null;
+    this.agentBeams = [];
+    this.taskPapers = [];
+    this.agentLookup = {}; // id -> agent group
+  }
+
+  async init() {
+    await this.setupThreeJS();
+    await this.audio.init();
+    document.getElementById('loading').style.opacity = '0';
+    setTimeout(() => {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('intro').style.display = 'flex';
+      this.startIntro();
+    }, 800);
+  }
+
+  startIntro() {
+    const introCanvas = document.getElementById('intro-canvas');
+    this.introSeq = new IntroSequence(introCanvas);
+    this.introSeq.init();
+    setTimeout(() => { document.getElementById('intro-text').style.opacity = '1'; }, 3500);
+    setTimeout(() => { document.getElementById('tap-enter').style.opacity = '1'; }, 5500);
+    const start = () => {
+      document.getElementById('intro').removeEventListener('click', start);
+      document.getElementById('intro').removeEventListener('touchend', start);
+      this.startGame();
+    };
+    document.getElementById('intro').addEventListener('click', start);
+    document.getElementById('intro').addEventListener('touchend', start);
+  }
+
+  startGame() {
+    this.introSeq.destroy();
+    this.audio.startBGM(); this.audio.fadeIn(4);
+    document.getElementById('intro').style.opacity = '0';
+    setTimeout(() => { document.getElementById('intro').style.display = 'none'; }, 1500);
+    setTimeout(() => {
+      document.getElementById('top-bar').classList.add('visible');
+      document.getElementById('right-panel').classList.add('visible');
+      document.getElementById('controls-hint').classList.add('visible');
+      document.getElementById('minimap-container').classList.add('visible');
+      document.getElementById('view-mode').classList.add('visible');
+    }, 800);
+    this.gameStarted = true;
+    this.setupInput();
+    this.updateViewModeUI();
+    this.animate();
+    this.updateAgentPanel();
+    setInterval(() => this.updateAgentPanel(), 60 * 1000);
+    this.loadCalendarData();
+    this.fetchGitHubCommit();
+    // デモモード無効化（実データのみ表示）
+    // this.startDemoTaskLoop();
+    // Poll hitomi status every 5s and update hitomi badge
+    setInterval(() => this.pollHitomiStatus(), 5000);
+    // Poll Upwork status every 5s
+    this.lastAppliedCount = 0;
+    this.pollUpworkStatus();
+    setInterval(() => this.pollUpworkStatus(), 5000);
+  }
+
+  async setupThreeJS() {
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0xdbeafe);
+    this.scene.fog = new THREE.FogExp2(0xdbeafe, 0.0015);
+
+    this.camera = new THREE.PerspectiveCamera(35, this.getAspect(), 0.1, 500);
+    this.camera.position.set(0, 65, 55);
+    this.camera.lookAt(0, 0, -5);
+    this.smoothCamPos.copy(this.camera.position);
+
+    this.renderer = new THREE.WebGLRenderer({ antialias: !IS_MOBILE, powerPreference: 'high-performance' });
+    this.renderer.setSize(this.getWidth(), this.getHeight());
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.4;
+
+    const gameArea = document.getElementById('game-area');
+    gameArea.appendChild(this.renderer.domElement);
+
+    // Lights — bright, natural
+    const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+    this.scene.add(ambient);
+    const dirLight = new THREE.DirectionalLight(0xfff5e6, 1.2);
+    dirLight.position.set(30, 50, 30);
+    dirLight.castShadow = false;
+    this.scene.add(dirLight);
+    const dirLight2 = new THREE.DirectionalLight(0xe0e7ff, 0.4);
+    dirLight2.position.set(-20, 30, -20);
+    this.scene.add(dirLight2);
+    const hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x98d8c8, 0.5);
+    this.scene.add(hemiLight);
+
+    // Create world
+    this.createGround();
+    this.createClouds();
+    this.createIslands();
+    this.createBridges();
+    this.createCharacter();
+    this.createAmbientParticles();
+    this.createAgentCharacters();
+    this.createConnectionBeams();
+
+    window.addEventListener('resize', () => this.onResize());
+  }
+
+  getWidth() { return IS_MOBILE ? window.innerWidth : window.innerWidth - 250; }
+  getHeight() { return window.innerHeight - 52; }
+  getAspect() { return this.getWidth() / this.getHeight(); }
+
+  // ---------- GROUND ----------
+  createGround() {
+    // Soft green ground plane
+    const groundGeo = new THREE.PlaneGeometry(400, 400, 1, 1);
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0xb8e6c8, roughness: 0.9, metalness: 0 });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = -6;
+    this.scene.add(ground);
+
+    // Water plane beneath
+    const waterGeo = new THREE.PlaneGeometry(600, 600, 1, 1);
+    const waterMat = new THREE.MeshStandardMaterial({ color: 0x93c5fd, roughness: 0.3, metalness: 0.1, transparent: true, opacity: 0.7 });
+    const water = new THREE.Mesh(waterGeo, waterMat);
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = -8;
+    this.scene.add(water);
+  }
+
+  // ---------- CLOUDS ----------
+  createClouds() {
+    this.clouds = [];
+    const cloudCount = IS_MOBILE ? 8 : 15;
+    for (let i = 0; i < cloudCount; i++) {
+      const group = new THREE.Group();
+      const puffCount = 3 + Math.floor(Math.random() * 4);
+      for (let j = 0; j < puffCount; j++) {
+        const geo = new THREE.SphereGeometry(2 + Math.random() * 3, 8, 8);
+        const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, transparent: true, opacity: 0.85 });
+        const puff = new THREE.Mesh(geo, mat);
+        puff.position.set((Math.random() - 0.5) * 6, Math.random() * 1.5, (Math.random() - 0.5) * 4);
+        puff.scale.y = 0.5 + Math.random() * 0.3;
+        group.add(puff);
+      }
+      group.position.set((Math.random() - 0.5) * 250, 35 + Math.random() * 25, (Math.random() - 0.5) * 250);
+      group.userData.speed = 0.3 + Math.random() * 0.5;
+      this.scene.add(group);
+      this.clouds.push(group);
+    }
+  }
+
+  // ---------- ISLANDS ----------
+  createIslands() {
+    PROJECTS.forEach((proj, index) => {
+      const group = new THREE.Group();
+      group.position.copy(proj.position);
+      group.userData = { project: proj, index, pulseIntensity: 0 };
+
+      const isHome = proj.id === 'home';
+      const isHitomi = proj.id === 'hitomi-work';
+      const isTrade = proj.id === 'trade';
+      const isOimo = proj.id === 'oimo';
+      const baseRadius = isHome ? 14 : isHitomi ? 12 : (isTrade || isOimo) ? 10 : 8 + Math.random() * 2;
+      const baseHeight = 4 + Math.random() * 1.5;
+
+      // Main platform — rounded cylinder, colorful
+      const baseGeo = new THREE.CylinderGeometry(baseRadius, baseRadius * 1.1, baseHeight, 32);
+      const baseMat = new THREE.MeshStandardMaterial({
+        color: proj.color.clone().lerp(new THREE.Color(0xffffff), 0.3),
+        roughness: 0.6, metalness: 0.1,
+      });
+      const base = new THREE.Mesh(baseGeo, baseMat);
+      base.position.y = -baseHeight / 2;
+      group.add(base);
+
+      // Top surface — bright
+      const topGeo = new THREE.CylinderGeometry(baseRadius * 0.95, baseRadius * 0.95, 0.4, 32);
+      const topMat = new THREE.MeshStandardMaterial({
+        color: proj.color.clone().lerp(new THREE.Color(0xffffff), 0.5),
+        roughness: 0.3, metalness: 0.15,
+      });
+      const top = new THREE.Mesh(topGeo, topMat);
+      top.position.y = 0.2;
+      group.add(top);
+
+      // Grass rim
+      const rimGeo = new THREE.TorusGeometry(baseRadius * 0.97, 0.3, 8, 32);
+      const rimMat = new THREE.MeshStandardMaterial({ color: 0x6bbc6b, roughness: 0.8 });
+      const rim = new THREE.Mesh(rimGeo, rimMat);
+      rim.rotation.x = Math.PI / 2;
+      rim.position.y = 0.3;
+      group.add(rim);
+
+      // Island decorations
+      this.decorateIsland(group, proj, baseRadius);
+
+      // Point light
+      const light = new THREE.PointLight(proj.glowColor, 1, 30);
+      light.position.y = 5;
+      group.add(light);
+      group.userData.light = light;
+
+      // Label sprite — name + status + description
+      const sprite = this.createLabel(proj);
+      sprite.position.y = 14 + (isHome ? 3 : 0);
+      group.add(sprite);
+      this.labelSprites.push(sprite);
+
+      // hitomi作業島専用: モニター + 指令掲示板
+      if (proj.id === 'hitomi-work') {
+        this.addHitomiMonitor(group);
+        this.addArchitectureBoard(group);
+        this.addWorkDesk(group);
+        this.addProjectShelf(group);
+      }
+      // OIMO FARM島: ダッシュボードを追跡用に登録
+      if (proj.id === 'oimo') {
+        this.oimoIsland = group;
+      }
+
+      this.scene.add(group);
+      this.islands.push(group);
+      this.islandMeshes.push(base, top);
+    });
+  }
+
+  addWorkDesk(group) {
+    // デスク本体
+    const deskMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3, metalness: 0.6 });
+    const deskTop = new THREE.Mesh(new THREE.BoxGeometry(4, 0.12, 2), deskMat);
+    deskTop.position.set(0, 1.5, -3.5);
+    group.add(deskTop);
+    // 脚
+    [[1.8, -3], [-1.8, -3], [1.8, -4.8], [-1.8, -4.8]].forEach(([x, z]) => {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.5, 8), deskMat);
+      leg.position.set(x, 0.75, z); group.add(leg);
+    });
+    // 仕事モニター（Cash計画）
+    const monMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8, roughness: 0.1 });
+    const monFrame = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.6, 0.1), monMat);
+    monFrame.position.set(0, 3.0, -3.6);
+    group.add(monFrame);
+    // モニタースタンド
+    const mStand = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.9, 8), monMat);
+    mStand.position.set(0, 2.0, -3.6); group.add(mStand);
+
+    // Canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 320;
+    const ctx = canvas.getContext('2d');
+    const tex = new THREE.CanvasTexture(canvas);
+    const monScreen = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.4, 1.4),
+      new THREE.MeshBasicMaterial({ map: tex })
+    );
+    monScreen.position.set(0, 3.0, -3.54);
+    group.add(monScreen);
+    // クリック判定用タグ
+    monScreen.userData.hitomiPanel = 'cash';
+    this.hitomiPanelMeshes = this.hitomiPanelMeshes || [];
+    this.hitomiPanelMeshes.push(monScreen);
+
+    const drawCash = () => {
+      ctx.fillStyle = '#0a0a1a'; ctx.fillRect(0, 0, 512, 320);
+      // タイトルバー
+      const g = ctx.createLinearGradient(0, 0, 512, 0);
+      g.addColorStop(0, '#16a34a'); g.addColorStop(1, '#065f46');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, 512, 36);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 14px monospace'; ctx.textAlign = 'center';
+      ctx.fillText('💰 CASH PLAN', 256, 24); ctx.textAlign = 'left';
+      // Upwork
+      ctx.fillStyle = '#22c55e'; ctx.font = 'bold 12px monospace';
+      ctx.fillText('▶ Upwork', 16, 62);
+      ctx.fillStyle = '#94a3b8'; ctx.font = '11px monospace';
+      ctx.fillText('プロフィール設定中... 60%完成', 16, 80);
+      ctx.fillText('目標: $25/hr × 案件獲得待ち', 16, 96);
+      // 仕切り線
+      ctx.strokeStyle = '#1e3a5f'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(16, 110); ctx.lineTo(496, 110); ctx.stroke();
+      // Trading
+      ctx.fillStyle = '#fbbf24'; ctx.font = 'bold 12px monospace';
+      ctx.fillText('▶ Trading AI', 16, 132);
+      ctx.fillStyle = '#94a3b8'; ctx.font = '11px monospace';
+      ctx.fillText('稼働中 — 損益: +$1,084', 16, 150);
+      ctx.fillText('LINE レポート: 毎朝7時', 16, 166);
+      // 仕切り線
+      ctx.beginPath(); ctx.moveTo(16, 180); ctx.lineTo(496, 180); ctx.stroke();
+      // 合計
+      ctx.fillStyle = '#e2e8f0'; ctx.font = 'bold 13px monospace';
+      ctx.fillText('総収益（今月）', 16, 204);
+      ctx.fillStyle = '#22c55e'; ctx.font = 'bold 18px monospace';
+      ctx.fillText('$1,084', 16, 228);
+      ctx.fillStyle = '#475569'; ctx.font = '10px monospace';
+      const now = new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'});
+      ctx.fillText('更新: ' + now, 380, 310);
+      tex.needsUpdate = true;
+    };
+    drawCash();
+    setInterval(drawCash, 30000);
+
+    // クリックで全画面オーバーレイを開く
+    monScreen.userData.onHitomiClick = () => this.openHitomiFullscreen('cash');
+  }
+
+  addHitomiMonitor(group) {
+    // モニターフレーム
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2, metalness: 0.8 });
+    const frameGeo = new THREE.BoxGeometry(3.4, 2.4, 0.15);
+    const frame = new THREE.Mesh(frameGeo, frameMat);
+    frame.position.set(-3, 4, 0);
+    group.add(frame);
+
+    // スクリーンCanvas
+    const canvas = document.createElement('canvas');
+    canvas.width = 640; canvas.height = 400;
+    const ctx = canvas.getContext('2d');
+    const tex = new THREE.CanvasTexture(canvas);
+    const screenMat = new THREE.MeshBasicMaterial({ map: tex });
+    const screenGeo = new THREE.PlaneGeometry(3.0, 2.0);
+    const screen = new THREE.Mesh(screenGeo, screenMat);
+    screen.position.set(-3, 4, 0.09);
+    group.add(screen);
+
+    // LEDインジケーター
+    const led = new THREE.Mesh(
+      new THREE.SphereGeometry(0.08, 8, 8),
+      new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 2 })
+    );
+    led.position.set(-1.6, 5.15, 0.12);
+    group.add(led);
+    this.hitomiLed = led;
+
+    // スタンド
+    const standGeo = new THREE.CylinderGeometry(0.08, 0.15, 1.5, 8);
+    const stand = new THREE.Mesh(standGeo, frameMat);
+    stand.position.set(-3, 2.8, 0);
+    group.add(stand);
+
+    // 定期更新関数
+    const img = new Image();
+    const updateScreen = () => {
+      fetch('/hitomi-status?t=' + Date.now())
+        .then(r => r.json())
+        .then(data => {
+          ctx.fillStyle = '#0a0a1a';
+          ctx.fillRect(0, 0, 640, 400);
+
+          if (data.active) {
+            // LED点灯
+            if (this.hitomiLed) this.hitomiLed.material.emissiveIntensity = 2;
+
+            // スクリーンショットを購読
+            img.onload = () => {
+              ctx.drawImage(img, 0, 0, 640, 320);
+              ctx.fillStyle = 'rgba(0,0,0,0.7)';
+              ctx.fillRect(0, 320, 640, 80);
+              ctx.fillStyle = '#22c55e';
+              ctx.font = 'bold 13px monospace';
+              ctx.fillText('● LIVE: ' + (data.action || ''), 10, 342);
+              ctx.fillStyle = '#94a3b8';
+              ctx.font = '11px monospace';
+              const url = (data.url || '').substring(0, 70);
+              ctx.fillText(url, 10, 362);
+              tex.needsUpdate = true;
+            };
+            img.src = '/hitomi-screenshot?t=' + Date.now();
+          } else {
+            if (this.hitomiLed) this.hitomiLed.material.emissiveIntensity = 0.3;
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(20, 80, 600, 240);
+            ctx.fillStyle = '#475569';
+            ctx.font = 'bold 28px monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('待機中...', 320, 190);
+            ctx.fillStyle = '#334155';
+            ctx.font = '16px monospace';
+            ctx.fillText('hitomi browser オフライン', 320, 230);
+            ctx.textAlign = 'left';
+            tex.needsUpdate = true;
+          }
+        })
+        .catch(() => {});
+    };
+    updateScreen();
+    setInterval(updateScreen, 2000);
+  }
+
+  addArchitectureBoard(group) {
+    // 掟示板パネル
+    const boardMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.3, metalness: 0.5, emissive: 0x1e1b4b, emissiveIntensity: 0.3 });
+    const boardGeo = new THREE.BoxGeometry(3.2, 4.5, 0.1);
+    const board = new THREE.Mesh(boardGeo, boardMat);
+    board.position.set(3.5, 4.5, 0);
+    group.add(board);
+
+    // 樠
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7, roughness: 0.2 });
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 6, 8), poleMat);
+    pole.position.set(3.5, 3, 0);
+    group.add(pole);
+
+    // Canvas描画
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 720;
+    const ctx = canvas.getContext('2d');
+    const tex = new THREE.CanvasTexture(canvas);
+    const planeMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 4.3), planeMat);
+    plane.position.set(3.5, 4.5, 0.07);
+    group.add(plane);
+
+    const drawBoard = (hitomiActive, subActive) => {
+      ctx.clearRect(0, 0, 512, 720);
+
+      // 背景
+      ctx.fillStyle = 'rgba(15,23,42,0.95)';
+      ctx.beginPath(); ctx.roundRect(0, 0, 512, 720, 16); ctx.fill();
+
+      // タイトル
+      const grad = ctx.createLinearGradient(0, 0, 512, 0);
+      grad.addColorStop(0, '#6366f1'); grad.addColorStop(1, '#a855f7');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 50);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 18px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('AI アーキテクチャ', 256, 32);
+      ctx.textAlign = 'left';
+
+      const line = (text, x, y, color = '#e2e8f0', size = 13) => {
+        ctx.fillStyle = color;
+        ctx.font = size + 'px monospace';
+        ctx.fillText(text, x, y);
+      };
+      const dot = (active) => active ? '●' : '○';
+      const col = (active) => active ? '#22c55e' : '#64748b';
+
+      let y = 80;
+      line('Joe', 30, y, '#f8fafc', 14); y += 8;
+      line('├─ Telegram  ●', 30, y += 18, '#38bdf8', 12);
+      line('├─ LINE       ●', 30, y += 18, '#22c55e', 12);
+      line('└─ Slack (Undelry) ●', 30, y += 18, '#f59e0b', 12);
+
+      y += 24;
+      line('↓', 50, y, '#6366f1', 16); y += 8;
+
+      y += 10;
+      ctx.fillStyle = hitomiActive ? 'rgba(99,102,241,0.2)' : 'rgba(30,27,75,0.5)';
+      ctx.beginPath(); ctx.roundRect(20, y - 18, 472, 34, 8); ctx.fill();
+      line('👁️ hitomi  ' + dot(hitomiActive), 30, y, hitomiActive ? '#a5b4fc' : '#475569', 14);
+      line(hitomiActive ? '▶ 稼働中' : '■ 待機', 380, y, col(hitomiActive), 11);
+      y += 30;
+
+      const items = [
+        { icon: '📧', label: 'Gmail (fastneura)', active: true },
+        { icon: '💬', label: 'Slack Bot', active: true },
+        { icon: '📅', label: 'Google Calendar', active: true },
+        { icon: '🔗', label: 'GitHub CLI', active: true },
+        { icon: '🌐', label: 'Playwright Browser', active: hitomiActive },
+        { icon: '🖥️', label: 'PyAutoGUI (OS制御)', active: false },
+      ];
+      items.forEach(item => {
+        line('├ ' + item.icon + ' ' + item.label, 40, y += 22, item.active ? '#94a3b8' : '#334155', 11);
+        line(dot(item.active), 470, y, col(item.active), 11);
+      });
+
+      y += 30;
+      ctx.fillStyle = subActive ? 'rgba(168,85,247,0.15)' : 'rgba(30,27,75,0.3)';
+      ctx.beginPath(); ctx.roundRect(20, y - 16, 472, 30, 8); ctx.fill();
+      line('🤖 Subagent  ' + dot(subActive), 30, y, subActive ? '#d8b4fe' : '#475569', 13);
+      line(subActive ? '▶ 稼働中' : '■ 無し', 380, y, col(subActive), 11);
+
+      y += 40;
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(20, y, 472, 1);
+      y += 20;
+      const now = new Date().toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+      line('更新: ' + now, 30, y, '#334155', 10);
+
+      tex.needsUpdate = true;
+    };
+
+    const updateBoard = () => {
+      fetch('/hitomi-status?t=' + Date.now())
+        .then(r => r.json())
+        .then(d => drawBoard(d.active === true, false))
+        .catch(() => drawBoard(false, false));
+    };
+    updateBoard();
+    setInterval(updateBoard, 5000);
+  }
+
+  addProjectShelf(group) {
+    // hitomi島の壁面にプロジェクト棚排パネルを追加
+    const projects = [
+      {name:'APLZ',     status:'active',  progress:35, icon:'🏙️'},
+      {name:'TILLA',    status:'stalled', progress:50, icon:'🧬'},
+      {name:'KUMAMON',  status:'active',  progress:65, icon:'🐻'},
+      {name:'SLEEP AI', status:'active',  progress:30, icon:'😴'},
+      {name:'OZ',       status:'active',  progress:80, icon:'🌐'},
+    ];
+
+    // パネルフレーム（正面・見やすい位置）
+    const shelfMat = new THREE.MeshStandardMaterial({ color: 0x1e1b4b, roughness: 0.3, metalness: 0.5, emissive: 0x3730a3, emissiveIntensity: 0.6 });
+    const shelfGeo = new THREE.BoxGeometry(5.5, 7.5, 0.15);
+    const shelf = new THREE.Mesh(shelfGeo, shelfMat);
+    shelf.position.set(0, 6, 7.5); // 正面・島の端
+    shelf.rotation.y = 0;
+    group.add(shelf);
+
+    // ポール左右
+    const poleMat = new THREE.MeshStandardMaterial({ color: 0x6366f1, metalness: 0.8, roughness: 0.1 });
+    [-2.5, 2.5].forEach(x => {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 9, 8), poleMat);
+      pole.position.set(x, 4.5, 7.5);
+      group.add(pole);
+    });
+
+    // Canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 720;
+    const ctx = canvas.getContext('2d');
+    const tex = new THREE.CanvasTexture(canvas);
+    const planeMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true });
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(5.3, 7.2), planeMat);
+    plane.position.set(0, 6, 7.6); // フレームより少し前
+    plane.rotation.y = 0;
+    group.add(plane);
+
+    const drawShelf = () => {
+      ctx.clearRect(0, 0, 512, 720);
+      // 背景
+      ctx.fillStyle = 'rgba(10,14,30,0.96)';
+      ctx.beginPath(); ctx.roundRect(0, 0, 512, 720, 16); ctx.fill();
+
+      // タイトルバー
+      const grad = ctx.createLinearGradient(0, 0, 512, 0);
+      grad.addColorStop(0, '#6366f1'); grad.addColorStop(1, '#a855f7');
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, 512, 52);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 20px monospace';
+      ctx.textAlign = 'center'; ctx.fillText('📌 PROJECT SHELF', 256, 34);
+      ctx.textAlign = 'left';
+
+      let y = 80;
+      projects.forEach((p, i) => {
+        // カード背景
+        const isActive = p.status === 'active';
+        ctx.fillStyle = isActive ? 'rgba(99,102,241,0.15)' : 'rgba(107,114,128,0.1)';
+        ctx.beginPath(); ctx.roundRect(16, y - 16, 480, 110, 10); ctx.fill();
+
+        // ステータスドット
+        ctx.fillStyle = isActive ? '#22c55e' : p.status === 'stalled' ? '#f59e0b' : '#ef4444';
+        ctx.beginPath(); ctx.arc(490, y + 12, 6, 0, Math.PI * 2); ctx.fill();
+
+        // アイコンと名前
+        ctx.font = '28px sans-serif'; ctx.fillText(p.icon, 28, y + 24);
+        ctx.font = 'bold 22px monospace'; ctx.fillStyle = '#e2e8f0';
+        ctx.fillText(p.name, 70, y + 24);
+
+        // ステータステキスト
+        ctx.font = '14px monospace';
+        ctx.fillStyle = isActive ? '#6ee7b7' : '#fcd34d';
+        ctx.fillText(p.status.toUpperCase(), 70, y + 50);
+
+        // 進捗バー背景
+        ctx.fillStyle = 'rgba(255,255,255,0.08)';
+        ctx.beginPath(); ctx.roundRect(28, y + 64, 448, 14, 7); ctx.fill();
+        // 進捗バーフィル
+        const barColor = isActive ? '#6366f1' : '#9ca3af';
+        ctx.fillStyle = barColor;
+        ctx.beginPath(); ctx.roundRect(28, y + 64, 448 * p.progress / 100, 14, 7); ctx.fill();
+        // 進捗%
+        ctx.font = 'bold 13px monospace'; ctx.fillStyle = '#a5b4fc';
+        ctx.textAlign = 'right'; ctx.fillText(p.progress + '%', 494, y + 76); ctx.textAlign = 'left';
+
+        y += 126;
+      });
+
+      // 更新時刻
+      const now = new Date().toLocaleTimeString('ja-JP', {hour:'2-digit', minute:'2-digit'});
+      ctx.fillStyle = '#334155'; ctx.font = '11px monospace';
+      ctx.fillText('updated: ' + now, 20, 708);
+
+      tex.needsUpdate = true;
+    };
+
+    drawShelf();
+    setInterval(drawShelf, 60000);
+  }
+
+  decorateIsland(group, proj, baseRadius) {
+    const mat = (color) => new THREE.MeshStandardMaterial({ color, roughness: 0.6, metalness: 0.1 });
+
+    switch (proj.id) {
+      case 'trade': {
+        // Golden tower with chart bars
+        const towerGeo = new THREE.BoxGeometry(2, 10, 2);
+        const tower = new THREE.Mesh(towerGeo, mat(0xd4a017));
+        tower.position.y = 5.3;
+        group.add(tower);
+        const antGeo = new THREE.CylinderGeometry(0.08, 0.08, 3, 4);
+        const ant = new THREE.Mesh(antGeo, mat(0xffd700));
+        ant.position.y = 11.5;
+        group.add(ant);
+        for (let i = 0; i < 6; i++) {
+          const h = 1.5 + Math.random() * 4;
+          const barGeo = new THREE.BoxGeometry(0.6, h, 0.6);
+          const isGreen = i < 4;
+          const barMat = new THREE.MeshStandardMaterial({ color: isGreen ? 0x22c55e : 0xef4444, roughness: 0.5 });
+          const bar = new THREE.Mesh(barGeo, barMat);
+          bar.position.set(-3.5 + i * 1.4, h / 2 + 0.3, 2.5);
+          bar.userData.isChartBar = true;
+          bar.userData.baseHeight = h;
+          group.add(bar);
+        }
+        break;
+      }
+      case 'aplz': {
+        // Blue city buildings
+        for (let i = 0; i < 7; i++) {
+          const h = 2 + Math.random() * 6;
+          const w = 0.8 + Math.random() * 1.2;
+          const geo = new THREE.BoxGeometry(w, h, w);
+          const mesh = new THREE.Mesh(geo, mat(0x2563eb));
+          const angle = (i / 7) * Math.PI * 2;
+          const r = 2 + Math.random() * 3;
+          mesh.position.set(Math.cos(angle) * r, h / 2 + 0.3, Math.sin(angle) * r);
+          group.add(mesh);
+        }
+        break;
+      }
+      case 'tilla': {
+        // Purple lab dome
+        const domeGeo = new THREE.SphereGeometry(3.5, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2);
+        const dome = new THREE.Mesh(domeGeo, mat(0x7c3aed));
+        dome.position.y = 0.3;
+        group.add(dome);
+        for (let i = 0; i < 5; i++) {
+          const orbGeo = new THREE.SphereGeometry(0.35, 8, 8);
+          const orb = new THREE.Mesh(orbGeo, new THREE.MeshStandardMaterial({ color: 0xc084fc, emissive: 0x8b5cf6, emissiveIntensity: 0.5 }));
+          const a = (i / 5) * Math.PI * 2;
+          orb.position.set(Math.cos(a) * 4, 3 + Math.random() * 2, Math.sin(a) * 4);
+          orb.userData.floatOffset = Math.random() * Math.PI * 2;
+          orb.userData.floatSpeed = 0.5 + Math.random() * 0.5;
+          orb.userData.isFloater = true;
+          group.add(orb);
+        }
+        break;
+      }
+      case 'kumamon': {
+        // Green trees + bear shape
+        for (let i = 0; i < 5; i++) {
+          const trunkGeo = new THREE.CylinderGeometry(0.2, 0.25, 2, 6);
+          const trunk = new THREE.Mesh(trunkGeo, mat(0x6b4226));
+          const leavesGeo = new THREE.SphereGeometry(1 + Math.random() * 0.5, 8, 8);
+          const leaves = new THREE.Mesh(leavesGeo, mat(0x22c55e));
+          const a = (i / 5) * Math.PI * 2;
+          const r = 2.5 + Math.random() * 2;
+          trunk.position.set(Math.cos(a) * r, 1.3, Math.sin(a) * r);
+          leaves.position.set(Math.cos(a) * r, 2.8, Math.sin(a) * r);
+          group.add(trunk, leaves);
+        }
+        // Bear body
+        const bodyGeo = new THREE.SphereGeometry(2, 16, 16);
+        const body = new THREE.Mesh(bodyGeo, mat(0x1a1a1a));
+        body.position.y = 2.3; body.scale.y = 1.2;
+        group.add(body);
+        const cheekGeo = new THREE.SphereGeometry(0.5, 8, 8);
+        const cheekMat = mat(0xef4444);
+        const cheek1 = new THREE.Mesh(cheekGeo, cheekMat);
+        cheek1.position.set(-1.3, 2.8, 1.2);
+        const cheek2 = new THREE.Mesh(cheekGeo, cheekMat);
+        cheek2.position.set(1.3, 2.8, 1.2);
+        group.add(cheek1, cheek2);
+        break;
+      }
+      case 'sleep': {
+        // Moon + floating stars
+        const moonGeo = new THREE.SphereGeometry(2, 16, 16);
+        const moon = new THREE.Mesh(moonGeo, new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xfbbf24, emissiveIntensity: 0.3 }));
+        moon.position.set(0, 6, 0);
+        group.add(moon);
+        const shadowGeo = new THREE.SphereGeometry(1.7, 16, 16);
+        const shadow = new THREE.Mesh(shadowGeo, new THREE.MeshStandardMaterial({ color: 0xdbeafe }));
+        shadow.position.set(0.7, 6.4, -0.5);
+        group.add(shadow);
+        for (let i = 0; i < 8; i++) {
+          const starGeo = new THREE.OctahedronGeometry(0.2 + Math.random() * 0.25);
+          const star = new THREE.Mesh(starGeo, new THREE.MeshStandardMaterial({ color: 0xeef2ff, emissive: 0x6366f1, emissiveIntensity: 0.5 }));
+          star.position.set((Math.random() - 0.5) * 10, 2 + Math.random() * 7, (Math.random() - 0.5) * 10);
+          star.userData.floatOffset = Math.random() * Math.PI * 2;
+          star.userData.floatSpeed = 0.3 + Math.random() * 0.5;
+          star.userData.isFloater = true;
+          group.add(star);
+        }
+        break;
+      }
+      case 'oimo': {
+        // おいもほり島 — 櫻と田んぼのある農場風景
+        // 良の山（山字型の丸い丘）
+        for (let i = 0; i < 3; i++) {
+          const hillGeo = new THREE.SphereGeometry(1.5 + Math.random() * 0.5, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+          const hillMat = new THREE.MeshStandardMaterial({ color: 0x7c5c2e, roughness: 0.9 });
+          const hill = new THREE.Mesh(hillGeo, hillMat);
+          const angle = (i / 3) * Math.PI * 2;
+          hill.position.set(Math.cos(angle) * 4, 0.3, Math.sin(angle) * 4);
+          group.add(hill);
+        }
+        // サツマイモ山（ざくざくの丸い農作物）
+        for (let i = 0; i < 8; i++) {
+          const imoGeo = new THREE.SphereGeometry(0.4 + Math.random() * 0.25, 8, 6);
+          const imoMat = new THREE.MeshStandardMaterial({ color: 0xa855f7, roughness: 0.7, emissive: 0xa855f7, emissiveIntensity: 0.15 });
+          const imo = new THREE.Mesh(imoGeo, imoMat);
+          const a = (i / 8) * Math.PI * 2;
+          const r = 2.5 + Math.random() * 2;
+          imo.position.set(Math.cos(a) * r, 0.25 + Math.random() * 0.5, Math.sin(a) * r);
+          imo.userData.floatOffset = Math.random() * Math.PI * 2;
+          imo.userData.isFloater = true;
+          group.add(imo);
+        }
+        // Upworkダッシュボード（平面パネル）
+        const boardGeo = new THREE.BoxGeometry(5.5, 3.5, 0.15);
+        const boardMat = new THREE.MeshStandardMaterial({ color: 0x1a0a00, roughness: 0.5, metalness: 0.2 });
+        const board = new THREE.Mesh(boardGeo, boardMat);
+        board.position.set(0, 4, 0);
+        board.userData.isOimoBoard = true;
+        group.add(board);
+        const poleLGeo = new THREE.CylinderGeometry(0.08, 0.08, 5, 6);
+        const poleMat = new THREE.MeshStandardMaterial({ color: 0xf97316, metalness: 0.6 });
+        const poleL = new THREE.Mesh(poleLGeo, poleMat);
+        poleL.position.set(-2.4, 2.5, 0);
+        const poleR = new THREE.Mesh(poleLGeo, poleMat);
+        poleR.position.set(2.4, 2.5, 0);
+        group.add(poleL, poleR);
+        // ダッシュボードテキスチャ
+        const boardCanvas = document.createElement('canvas');
+        boardCanvas.width = 512; boardCanvas.height = 320;
+        boardCanvas.id = 'oimo-board-canvas-' + Math.random().toString(36).slice(2);
+        group.userData.oimoBoardCanvas = boardCanvas;
+        const boardCtx = boardCanvas.getContext('2d');
+        boardCtx.fillStyle = '#1a0800';
+        boardCtx.fillRect(0, 0, 512, 320);
+        boardCtx.fillStyle = '#f97316';
+        boardCtx.font = 'bold 22px sans-serif';
+        boardCtx.textAlign = 'center';
+        boardCtx.fillText('🥔 OIMO FARM', 256, 38);
+        boardCtx.fillStyle = '#fbbf24';
+        boardCtx.font = 'bold 16px sans-serif';
+        boardCtx.fillText('Upwork 自動収益化', 256, 64);
+        boardCtx.fillStyle = '#94a3b8';
+        boardCtx.font = '14px sans-serif';
+        boardCtx.fillText('読み込み中...', 256, 160);
+        const boardTex = new THREE.CanvasTexture(boardCanvas);
+        boardTex.minFilter = THREE.LinearFilter;
+        const boardPlane = new THREE.Mesh(
+          new THREE.PlaneGeometry(5.2, 3.2),
+          new THREE.MeshBasicMaterial({ map: boardTex, transparent: true })
+        );
+        boardPlane.position.set(0, 4, 0.09);
+        group.userData.oimoBoardTex = boardTex;
+        group.userData.oimoBoardCanvas = boardCanvas;
+        group.add(boardPlane);
+        break;
+      }
+      case 'oz': {
+        // Holographic globe
+        const globeGeo = new THREE.SphereGeometry(2.5, 24, 24);
+        const globeMat = new THREE.MeshStandardMaterial({ color: 0x818cf8, emissive: 0x6366f1, emissiveIntensity: 0.2, wireframe: true, transparent: true, opacity: 0.6 });
+        const globe = new THREE.Mesh(globeGeo, globeMat);
+        globe.position.y = 4;
+        globe.userData.isRotator = true;
+        group.add(globe);
+        const innerGeo = new THREE.SphereGeometry(2.2, 16, 16);
+        const innerMat = new THREE.MeshStandardMaterial({ color: 0xc7d2fe, transparent: true, opacity: 0.3 });
+        const inner = new THREE.Mesh(innerGeo, innerMat);
+        inner.position.y = 4;
+        group.add(inner);
+        break;
+      }
+      case 'home': {
+        // Japanese-style house
+        const houseGeo = new THREE.BoxGeometry(7, 3.5, 6);
+        const house = new THREE.Mesh(houseGeo, mat(0xf8fafc));
+        house.position.y = 2.1;
+        group.add(house);
+        const roofGeo = new THREE.BoxGeometry(8, 0.6, 7);
+        const roof = new THREE.Mesh(roofGeo, mat(0x4338ca));
+        roof.position.y = 4.1;
+        group.add(roof);
+        // Torii gate
+        const pillarGeo = new THREE.CylinderGeometry(0.15, 0.15, 3.5, 6);
+        const pillarMat = mat(0x6366f1);
+        const pillar1 = new THREE.Mesh(pillarGeo, pillarMat);
+        pillar1.position.set(-1.5, 2, 5);
+        const pillar2 = new THREE.Mesh(pillarGeo, pillarMat);
+        pillar2.position.set(1.5, 2, 5);
+        group.add(pillar1, pillar2);
+        const beamGeo = new THREE.BoxGeometry(4.5, 0.25, 0.25);
+        const beam = new THREE.Mesh(beamGeo, pillarMat);
+        beam.position.set(0, 3.8, 5);
+        group.add(beam);
+        // Garden lights
+        for (let i = 0; i < 6; i++) {
+          const gLight = new THREE.PointLight(0x6366f1, 0.3, 10);
+          const a = (i / 6) * Math.PI * 2;
+          gLight.position.set(Math.cos(a) * 9, 1.5, Math.sin(a) * 9);
+          group.add(gLight);
+        }
+        break;
+      }
+    }
+  }
+
+  createLabel(proj) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 640; canvas.height = 240;
+    ctx.clearRect(0, 0, 640, 240);
+
+    // Background pill
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+    ctx.shadowColor = 'rgba(0,0,0,0.1)';
+    ctx.shadowBlur = 10;
+    ctx.shadowOffsetY = 2;
+    ctx.beginPath(); ctx.roundRect(20, 10, 600, 220, 20); ctx.fill();
+    ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+
+    // Color accent bar
+    const r = Math.round(proj.color.r * 255), g = Math.round(proj.color.g * 255), b = Math.round(proj.color.b * 255);
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.beginPath(); ctx.roundRect(20, 10, 8, 220, [20, 0, 0, 20]); ctx.fill();
+
+    // Icon
+    ctx.font = '48px sans-serif';
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(proj.icon, 50, 60);
+
+    // Name (bold, large)
+    ctx.font = '900 36px "Noto Sans JP", sans-serif';
+    ctx.fillStyle = '#1e1b4b';
+    ctx.fillText(proj.name, 110, 58);
+
+    // Status badge
+    ctx.font = '24px sans-serif';
+    ctx.fillText(proj.statusBadge, 50, 120);
+
+    // nameJP
+    ctx.font = '500 22px "Noto Sans JP", sans-serif';
+    ctx.fillStyle = '#64748b';
+    ctx.fillText(proj.nameJP, 85, 120);
+
+    // Status line
+    ctx.font = '700 22px "Noto Sans JP", sans-serif';
+    ctx.fillStyle = '#4338ca';
+    ctx.fillText(proj.statusLine, 50, 175);
+
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.LinearFilter;
+    const spriteMat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.scale.set(16, 6, 1);
+    return sprite;
+  }
+
+  // ---------- BRIDGES ----------
+  createBridges() {
+    // 4島間のみ橋を作成
+    const homePos = PROJECTS[3].position; // HOME BASE
+    for (let i = 0; i < 3; i++) {
+      this.createBridge(PROJECTS[i].position, homePos, i, true);
+    }
+    // 隣接島間の橋
+    const connections = [[0,1],[1,2],[2,0]];
+    connections.forEach(([a, b]) => {
+      this.createBridge(PROJECTS[a].position, PROJECTS[b].position, a + 4, false);
+    });
+  }
+
+  createBridge(from, to, index, isMain) {
+    const points = [];
+    const segments = 30;
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      const x = from.x + (to.x - from.x) * t;
+      const z = from.z + (to.z - from.z) * t;
+      const y = from.y + (to.y - from.y) * t + Math.sin(t * Math.PI) * 3;
+      points.push(new THREE.Vector3(x, y, z));
+    }
+    const curve = new THREE.CatmullRomCurve3(points);
+    const geo = new THREE.TubeGeometry(curve, 30, isMain ? 0.15 : 0.08, 6, false);
+
+    // Soft pastel color
+    const hue = (index / 14);
+    const bridgeColor = new THREE.Color().setHSL(hue, 0.4, 0.75);
+    const bridgeMat = new THREE.MeshStandardMaterial({
+      color: bridgeColor, roughness: 0.4, metalness: 0.1,
+      transparent: true, opacity: isMain ? 0.6 : 0.3
+    });
+    const mesh = new THREE.Mesh(geo, bridgeMat);
+    mesh.userData.isMain = isMain;
+    this.scene.add(mesh);
+    this.bridgeLines.push(mesh);
+
+    // Particles along bridge
+    const pCount = IS_MOBILE ? 8 : 16;
+    const pGeo = new THREE.BufferGeometry();
+    const pPositions = new Float32Array(pCount * 3);
+    const pProgress = new Float32Array(pCount);
+    for (let i = 0; i < pCount; i++) {
+      pProgress[i] = Math.random();
+      const pt = curve.getPoint(pProgress[i]);
+      pPositions[i * 3] = pt.x; pPositions[i * 3 + 1] = pt.y; pPositions[i * 3 + 2] = pt.z;
+    }
+    pGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+    const pMat = new THREE.PointsMaterial({
+      color: bridgeColor, size: 0.4,
+      transparent: true, opacity: 0.5, depthWrite: false
+    });
+    const pMesh = new THREE.Points(pGeo, pMat);
+    pMesh.userData.curve = curve;
+    pMesh.userData.progress = pProgress;
+    this.scene.add(pMesh);
+    this.bridgeLines.push(pMesh);
+  }
+
+  // ---------- CHARACTER ----------
+  createCharacter() {
+    this.character = new THREE.Group();
+
+    const bodyGeo = new THREE.CapsuleGeometry(0.55, 0.6, 8, 16);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x6366f1, roughness: 0.4, metalness: 0.2 });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = 1.1;
+    this.character.add(body);
+    this.character.userData.body = body;
+
+    const headGeo = new THREE.SphereGeometry(0.55, 16, 16);
+    const headMat = new THREE.MeshStandardMaterial({ color: 0xfde68a, roughness: 0.5, metalness: 0.1 });
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.position.y = 2.15;
+    this.character.add(head);
+
+    const eyeGeo = new THREE.SphereGeometry(0.08, 8, 8);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x1e1b4b });
+    const eye1 = new THREE.Mesh(eyeGeo, eyeMat);
+    eye1.position.set(-0.2, 2.2, 0.45);
+    const eye2 = new THREE.Mesh(eyeGeo, eyeMat);
+    eye2.position.set(0.2, 2.2, 0.45);
+    this.character.add(eye1, eye2);
+
+    const armGeo = new THREE.CapsuleGeometry(0.12, 0.4, 4, 8);
+    const armMat = new THREE.MeshStandardMaterial({ color: 0x6366f1, roughness: 0.4, metalness: 0.2 });
+    const leftArm = new THREE.Mesh(armGeo, armMat);
+    leftArm.position.set(-0.7, 1.2, 0);
+    this.character.add(leftArm);
+    this.character.userData.leftArm = leftArm;
+    const rightArm = new THREE.Mesh(armGeo, armMat);
+    rightArm.position.set(0.7, 1.2, 0);
+    this.character.add(rightArm);
+    this.character.userData.rightArm = rightArm;
+
+    const legGeo = new THREE.CapsuleGeometry(0.13, 0.3, 4, 8);
+    const legMat = new THREE.MeshStandardMaterial({ color: 0x4338ca, roughness: 0.4, metalness: 0.2 });
+    const leftLeg = new THREE.Mesh(legGeo, legMat);
+    leftLeg.position.set(-0.25, 0.35, 0);
+    this.character.add(leftLeg);
+    this.character.userData.leftLeg = leftLeg;
+    const rightLeg = new THREE.Mesh(legGeo, legMat);
+    rightLeg.position.set(0.25, 0.35, 0);
+    this.character.add(rightLeg);
+    this.character.userData.rightLeg = rightLeg;
+
+    // Shadow
+    const shadowGeo = new THREE.CircleGeometry(0.8, 16);
+    const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.15, depthWrite: false });
+    const shadow = new THREE.Mesh(shadowGeo, shadowMat);
+    shadow.rotation.x = -Math.PI / 2;
+    shadow.position.y = 0.05;
+    this.character.add(shadow);
+
+    this.character.position.copy(PROJECTS[3].position); // HOME BASE
+    this.character.position.y = 0.5;
+    this.scene.add(this.character);
+  }
+
+  // ---------- AMBIENT PARTICLES ----------
+  createAmbientParticles() {
+    const count = IS_MOBILE ? 200 : 500;
+    const geo = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const velocities = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+
+    for (let i = 0; i < count; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 200;
+      positions[i * 3 + 1] = Math.random() * 30;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 200;
+      velocities[i * 3] = (Math.random() - 0.5) * 0.02;
+      velocities[i * 3 + 1] = 0.01 + Math.random() * 0.02;
+      velocities[i * 3 + 2] = (Math.random() - 0.5) * 0.02;
+      sizes[i] = 0.2 + Math.random() * 0.5;
+    }
+
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    this.ambientParticleVelocities = velocities;
+
+    const mat = new THREE.PointsMaterial({
+      color: 0xc7d2fe, size: 0.4, transparent: true, opacity: 0.4, depthWrite: false
+    });
+    this.ambientParticles = new THREE.Points(geo, mat);
+    this.scene.add(this.ambientParticles);
+  }
+
+  // ---------- AGENT CHARACTERS ----------
+  buildCuteCharacter(agent, def) {
+    // Cute chibi character: big head, small body, character-specific design
+    const mat = (color, emissive = null, emissiveIntensity = 0) => new THREE.MeshStandardMaterial({
+      color, roughness: 0.4, metalness: 0.1,
+      emissive: emissive || color, emissiveIntensity
+    });
+
+    // Body (torso)
+    const bodyGeo = new THREE.CylinderGeometry(0.28, 0.32, 0.65, 12);
+    const body = new THREE.Mesh(bodyGeo, mat(def.bodyColor));
+    body.position.y = 0.82;
+    agent.add(body);
+    agent.userData.body = body;
+
+    // Head (big, chibi style)
+    const headGeo = new THREE.SphereGeometry(0.42, 16, 16);
+    const head = new THREE.Mesh(headGeo, mat(def.skinColor || 0xfde68a));
+    head.position.y = 1.6;
+    agent.add(head);
+    agent.userData.head = head;
+
+    // Eyes
+    const eyeGeo = new THREE.SphereGeometry(0.065, 8, 8);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: def.eyeColor || 0x1e1b4b });
+    const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+    eyeL.position.set(-0.16, 1.64, 0.37);
+    const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+    eyeR.position.set(0.16, 1.64, 0.37);
+    agent.add(eyeL, eyeR);
+
+    // Eye shine
+    const shineGeo = new THREE.SphereGeometry(0.02, 6, 6);
+    const shineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const shL = new THREE.Mesh(shineGeo, shineMat);
+    shL.position.set(-0.14, 1.665, 0.43);
+    const shR = new THREE.Mesh(shineGeo, shineMat);
+    shR.position.set(0.18, 1.665, 0.43);
+    agent.add(shL, shR);
+
+    // Cheeks (cute blush)
+    const cheekGeo = new THREE.SphereGeometry(0.09, 8, 8);
+    const cheekMat = new THREE.MeshBasicMaterial({ color: 0xffb3b3, transparent: true, opacity: 0.6 });
+    const cheekL = new THREE.Mesh(cheekGeo, cheekMat);
+    cheekL.position.set(-0.3, 1.57, 0.28);
+    cheekL.scale.set(1, 0.5, 0.3);
+    const cheekR = new THREE.Mesh(cheekGeo, cheekMat);
+    cheekR.position.set(0.3, 1.57, 0.28);
+    cheekR.scale.set(1, 0.5, 0.3);
+    agent.add(cheekL, cheekR);
+
+    // Arms
+    const armGeo = new THREE.CapsuleGeometry(0.1, 0.3, 4, 8);
+    const armL = new THREE.Mesh(armGeo, mat(def.bodyColor));
+    armL.position.set(-0.42, 0.95, 0);
+    armL.rotation.z = 0.4;
+    const armR = new THREE.Mesh(armGeo, mat(def.bodyColor));
+    armR.position.set(0.42, 0.95, 0);
+    armR.rotation.z = -0.4;
+    agent.add(armL, armR);
+    agent.userData.leftArm = armL;
+    agent.userData.rightArm = armR;
+
+    // Legs
+    const legGeo = new THREE.CapsuleGeometry(0.1, 0.25, 4, 8);
+    const legL = new THREE.Mesh(legGeo, mat(def.legsColor || def.bodyColor));
+    legL.position.set(-0.17, 0.38, 0);
+    const legR = new THREE.Mesh(legGeo, mat(def.legsColor || def.bodyColor));
+    legR.position.set(0.17, 0.38, 0);
+    agent.add(legL, legR);
+    agent.userData.leftLeg = legL;
+    agent.userData.rightLeg = legR;
+
+    // Character-specific accessories
+    if (def.accessories) def.accessories(agent, mat);
+
+    return agent;
+  }
+
+  createStatusBadge(status = 'active') {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64; canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, 64, 64);
+    const colors = { active: '#22c55e', busy: '#f59e0b', idle: '#94a3b8' };
+    const color = colors[status] || colors.idle;
+    ctx.shadowColor = color; ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(32, 32, 20, 0, Math.PI * 2);
+    ctx.fillStyle = color; ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.beginPath(); ctx.arc(32, 32, 20, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 3; ctx.stroke();
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.LinearFilter;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+    sprite.scale.set(0.7, 0.7, 1);
+    return sprite;
+  }
+
+  createAgentCharacters() {
+    const agentDefs = [
+      {
+        id: 'hitomi',
+        label: 'hitomi（仁）',
+        homeIslandIndex: 2, // hitomi-work island
+        bodyColor: 0x1e1b4b,    // dark mysterious outfit
+        legsColor: 0x312e81,
+        skinColor: 0xfde68a,
+        eyeColor: 0x7c3aed,     // purple eyes
+        speed: 3, patrolRadius: 8, visitOtherIslands: true,
+        visitChance: 0.3, moveInterval: [8000, 15000],
+        speeches: ['メールチェック完了 ✅', 'カレンダー更新済み 📅', 'タスク整理完了 ✨', 'Upwork監視中 👁️', 'エージェント統括中 🧠'],
+        speechInterval: [10000, 18000],
+        status: 'active',
+        accessories: (agent, mat) => {
+          // Black hair (bangs)
+          const hairGeo = new THREE.SphereGeometry(0.44, 12, 12, 0, Math.PI * 2, 0, Math.PI * 0.55);
+          const hair = new THREE.Mesh(hairGeo, mat(0x1a1a2e));
+          hair.position.set(0, 1.62, -0.05);
+          agent.add(hair);
+          // Hair bangs front
+          const bangGeo = new THREE.BoxGeometry(0.85, 0.15, 0.15);
+          const bang = new THREE.Mesh(bangGeo, mat(0x1a1a2e));
+          bang.position.set(0, 1.95, 0.3);
+          agent.add(bang);
+          // Purple glowing eye aura
+          const auraGeo = new THREE.SphereGeometry(0.08, 8, 8);
+          const auraMat = new THREE.MeshBasicMaterial({ color: 0x7c3aed, transparent: true, opacity: 0.8 });
+          const auraL = new THREE.Mesh(auraGeo, auraMat);
+          auraL.position.set(-0.16, 1.64, 0.4);
+          const auraR = new THREE.Mesh(auraGeo, auraMat);
+          auraR.position.set(0.16, 1.64, 0.4);
+          agent.add(auraL, auraR);
+          agent.userData.eyeAuras = [auraL, auraR];
+        }
+      },
+      {
+        id: 'tradingEngineer',
+        label: 'TradingEngineer',
+        homeIslandIndex: 0, // trade island
+        bodyColor: 0x1e3a5f,    // dark suit
+        legsColor: 0x0f2444,
+        skinColor: 0xfde68a,
+        eyeColor: 0x0f172a,
+        speed: 6, patrolRadius: 6, visitOtherIslands: false,
+        visitChance: 0, moveInterval: [4000, 8000],
+        speeches: ['EDGAR監視中 📊', 'シグナル検知 📈', '損益: +$1,084 💰', 'バックテスト完了 ✅', 'リスク管理中 ⚠️'],
+        speechInterval: [8000, 14000],
+        status: 'active',
+        accessories: (agent, mat) => {
+          // Tie
+          const tieGeo = new THREE.BoxGeometry(0.1, 0.4, 0.05);
+          const tie = new THREE.Mesh(tieGeo, mat(0xfbbf24));
+          tie.position.set(0, 0.95, 0.3);
+          agent.add(tie);
+          // Tiny chart (floating)
+          const chartGeo = new THREE.PlaneGeometry(0.5, 0.35);
+          const chartCanvas = document.createElement('canvas');
+          chartCanvas.width = 128; chartCanvas.height = 90;
+          const cc = chartCanvas.getContext('2d');
+          cc.fillStyle = '#0a1628'; cc.fillRect(0,0,128,90);
+          cc.strokeStyle = '#22c55e'; cc.lineWidth = 2;
+          cc.beginPath();
+          [0,20,10,45,30,25,60,70,55,90].forEach((v,i) => i===0 ? cc.moveTo(i*14, 90-v) : cc.lineTo(i*14, 90-v));
+          cc.stroke();
+          const chartTex = new THREE.CanvasTexture(chartCanvas);
+          const chart = new THREE.Mesh(chartGeo, new THREE.MeshBasicMaterial({ map: chartTex, transparent: true }));
+          chart.position.set(0.7, 1.2, 0);
+          chart.userData.floatOffset = Math.random() * Math.PI * 2;
+          chart.userData.isFloater = true;
+          agent.add(chart);
+          agent.userData.chartMesh = chart;
+          // Glasses
+          const glassGeo = new THREE.TorusGeometry(0.085, 0.018, 5, 12);
+          const glassMat = mat(0xfbbf24);
+          const glassL = new THREE.Mesh(glassGeo, glassMat);
+          glassL.position.set(-0.17, 1.64, 0.38);
+          glassL.rotation.y = Math.PI / 2;
+          const glassR = new THREE.Mesh(glassGeo, glassMat);
+          glassR.position.set(0.17, 1.64, 0.38);
+          glassR.rotation.y = Math.PI / 2;
+          const bridgeGeo = new THREE.BoxGeometry(0.14, 0.015, 0.015);
+          const bridge = new THREE.Mesh(bridgeGeo, glassMat);
+          bridge.position.set(0, 1.64, 0.42);
+          agent.add(glassL, glassR, bridge);
+        }
+      },
+      {
+        id: 'claudeCode',
+        label: 'Claude Code',
+        homeIslandIndex: 3, // home island (oz removed)
+        bodyColor: 0x312e81,    // hoodie indigo
+        legsColor: 0x1e1b4b,
+        skinColor: 0xfde68a,
+        eyeColor: 0x0f172a,
+        speed: 5, patrolRadius: 7, visitOtherIslands: true,
+        visitChance: 0.5, moveInterval: [6000, 12000],
+        speeches: ['コーディング中 💻', 'テスト実行中 🧪', 'デプロイ準備 🚀', 'バグ修正完了 🐛', 'PR作成中 📝'],
+        speechInterval: [9000, 16000],
+        status: 'active',
+        accessories: (agent, mat) => {
+          // Hood
+          const hoodGeo = new THREE.SphereGeometry(0.46, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5);
+          const hood = new THREE.Mesh(hoodGeo, mat(0x312e81));
+          hood.position.set(0, 1.65, -0.1);
+          agent.add(hood);
+          // Glasses
+          const glassGeo = new THREE.TorusGeometry(0.085, 0.018, 5, 12);
+          const glassMat = mat(0x94a3b8);
+          const glassL = new THREE.Mesh(glassGeo, glassMat);
+          glassL.position.set(-0.17, 1.64, 0.38);
+          glassL.rotation.y = Math.PI / 2;
+          const glassR = new THREE.Mesh(glassGeo, glassMat);
+          glassR.position.set(0.17, 1.64, 0.38);
+          glassR.rotation.y = Math.PI / 2;
+          const bridgeGeo = new THREE.BoxGeometry(0.14, 0.015, 0.015);
+          const bridge = new THREE.Mesh(bridgeGeo, glassMat);
+          bridge.position.set(0, 1.64, 0.42);
+          agent.add(glassL, glassR, bridge);
+          // Laptop
+          const laptopBase = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.04, 0.4), mat(0x334155));
+          laptopBase.position.set(0.7, 0.78, 0);
+          const laptopScreen = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.35, 0.02), mat(0x0f172a));
+          laptopScreen.position.set(0.7, 0.99, -0.18);
+          laptopScreen.rotation.x = 0.35;
+          const laptopCanvas = document.createElement('canvas');
+          laptopCanvas.width = 128; laptopCanvas.height = 90;
+          const lc = laptopCanvas.getContext('2d');
+          lc.fillStyle = '#001a00'; lc.fillRect(0,0,128,90);
+          lc.fillStyle = '#00ff41'; lc.font = '7px monospace';
+          ['function hitomi() {', '  await task.run()', '  return result', '}', 'const ai = new AI()', '// running...'].forEach((l,i) => lc.fillText(l, 4, 12 + i*13));
+          const laptopTex = new THREE.CanvasTexture(laptopCanvas);
+          const laptopScreenMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.48, 0.31), new THREE.MeshBasicMaterial({ map: laptopTex }));
+          laptopScreenMesh.position.set(0.7, 0.99, -0.17);
+          laptopScreenMesh.rotation.x = 0.35;
+          agent.add(laptopBase, laptopScreen, laptopScreenMesh);
+          agent.userData.laptopTex = laptopTex;
+          agent.userData.laptopCanvas = laptopCanvas;
+        }
+      },
+      {
+        id: 'lineBot',
+        label: 'LINE Bot',
+        homeIslandIndex: 3, // HOME BASE
+        bodyColor: 0x06c755,  // LINE green
+        legsColor: 0x04a044,
+        skinColor: 0xfde68a,
+        eyeColor: 0x1e1b4b,
+        speed: 4, patrolRadius: 5, visitOtherIslands: false,
+        visitChance: 0, moveInterval: [6000, 12000],
+        speeches: ['LINE通知送信 📱', '返信完了 ✅', 'Joeに報告 📬', '新メッセージ検知 🔔', 'Trading報告済み 💹'],
+        speechInterval: [12000, 20000],
+        status: 'active',
+        accessories: (agent, mat) => {
+          // Smartphone
+          const phoneGeo = new THREE.BoxGeometry(0.2, 0.35, 0.03);
+          const phone = new THREE.Mesh(phoneGeo, mat(0x1a1a1a));
+          phone.position.set(0.55, 1.0, 0.1);
+          const screenGeo = new THREE.PlaneGeometry(0.16, 0.28);
+          const screenMat = new THREE.MeshBasicMaterial({ color: 0x06c755 });
+          const screen = new THREE.Mesh(screenGeo, screenMat);
+          screen.position.set(0.55, 1.0, 0.13);
+          agent.add(phone, screen);
+          // LINE icon circle on chest
+          const iconGeo = new THREE.SphereGeometry(0.12, 10, 10);
+          const icon = new THREE.Mesh(iconGeo, mat(0x06c755, 0x06c755, 0.5));
+          icon.position.set(0, 0.95, 0.3);
+          agent.add(icon);
+        }
+      },
+      {
+        id: 'slackBot',
+        label: 'Slack Bot',
+        homeIslandIndex: 3, // HOME BASE
+        bodyColor: 0x4a154b,  // Slack purple
+        legsColor: 0x350d36,
+        skinColor: 0xfde68a,
+        eyeColor: 0x1e1b4b,
+        speed: 4, patrolRadius: 5, visitOtherIslands: false,
+        visitChance: 0, moveInterval: [7000, 13000],
+        speeches: ['Slack通知済み 💬', '返信中... ✍️', 'チーム更新完了 👥', 'メンション検知 @', 'ログ送信済み 📋'],
+        speechInterval: [12000, 20000],
+        status: 'active',
+        accessories: (agent, mat) => {
+          // Speech bubble icon on chest
+          const bubbleGeo = new THREE.SphereGeometry(0.12, 10, 10);
+          const bubble = new THREE.Mesh(bubbleGeo, mat(0x4a154b, 0x7c3aed, 0.6));
+          bubble.position.set(0, 0.95, 0.3);
+          agent.add(bubble);
+          // Slack # symbol hint: a tiny cylinder
+          const hashGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.02, 16);
+          const hash = new THREE.Mesh(hashGeo, mat(0xe01e5a));
+          hash.position.set(-0.4, 1.5, 0.1);
+          hash.rotation.x = Math.PI / 2;
+          agent.add(hash);
+        }
+      }
+    ];
+
+    agentDefs.forEach(def => {
+      const agent = new THREE.Group();
+      const homePos = PROJECTS[def.homeIslandIndex].position;
+
+      // Build cute chibi character
+      this.buildCuteCharacter(agent, def);
+
+      // Name label
+      const nameCanvas = document.createElement('canvas');
+      const nameCtx = nameCanvas.getContext('2d');
+      nameCanvas.width = 320; nameCanvas.height = 56;
+      nameCtx.clearRect(0, 0, 320, 56);
+      nameCtx.fillStyle = 'rgba(15,23,42,0.85)';
+      nameCtx.beginPath(); nameCtx.roundRect(4, 4, 312, 48, 12); nameCtx.fill();
+      nameCtx.font = 'bold 20px "Noto Sans JP", "ヒラギノ角ゴ ProN W6", "メイリオ", sans-serif';
+      nameCtx.textAlign = 'center'; nameCtx.textBaseline = 'middle';
+      nameCtx.fillStyle = '#e0e7ff';
+      nameCtx.fillText(def.label, 160, 28);
+      const nameTex = new THREE.CanvasTexture(nameCanvas);
+      nameTex.minFilter = THREE.LinearFilter;
+      const nameSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: nameTex, transparent: true, depthWrite: false }));
+      nameSprite.scale.set(4.5, 0.8, 1);
+      nameSprite.position.y = 2.5;
+      agent.add(nameSprite);
+
+      // Status badge
+      const badge = this.createStatusBadge(def.status);
+      badge.position.set(0.55, 2.25, 0);
+      agent.add(badge);
+      agent.userData.statusBadge = badge;
+      agent.userData.badgeStatus = def.status;
+
+      // Speech sprite
+      const speechSprite = this.createAgentSpeechSprite('');
+      speechSprite.position.y = 3.4;
+      speechSprite.visible = false;
+      agent.add(speechSprite);
+      agent.userData.speechSprite = speechSprite;
+
+      // Position (stagger line & slack bot offset)
+      const offsetAngle = Math.random() * Math.PI * 2;
+      let offsetR = 3 + Math.random() * 4;
+      if (def.id === 'lineBot') { agent.position.set(homePos.x - 5, 0.5, homePos.z + 2); }
+      else if (def.id === 'slackBot') { agent.position.set(homePos.x + 5, 0.5, homePos.z + 2); }
+      else {
+        agent.position.set(homePos.x + Math.cos(offsetAngle) * offsetR, 0.5, homePos.z + Math.sin(offsetAngle) * offsetR);
+      }
+
+      agent.userData.def = def;
+      agent.userData.agentState = 'idle';
+      agent.userData.targetPos = agent.position.clone();
+      agent.userData.homeIslandIndex = def.homeIslandIndex;
+      agent.userData.currentIslandIndex = def.homeIslandIndex;
+      agent.userData.nextMoveTime = performance.now() + 2000 + Math.random() * 5000;
+      agent.userData.nextSpeechTime = performance.now() + 3000 + Math.random() * 6000;
+      agent.userData.speechEndTime = 0;
+      agent.userData.floatPhase = Math.random() * Math.PI * 2;
+      agent.userData.badgePulsePhase = Math.random() * Math.PI * 2;
+
+      this.scene.add(agent);
+      this.agentCharacters.push(agent);
+      this.agentLookup[def.id] = agent;
+    });
+
+    // Add ClaudeCode matrix terminal on OZ island
+    this.addClaudeCodeTerminal();
+  }
+
+  addClaudeCodeTerminal() {
+    // Find OZ island (index 6)
+    const ozIsland = this.islands[6];
+    if (!ozIsland) return;
+
+    // PC Monitor setup for ClaudeCode island
+    const monitorCanvas = document.createElement('canvas');
+    monitorCanvas.width = 384; monitorCanvas.height = 256;
+    const mctx = monitorCanvas.getContext('2d');
+    const monTex = new THREE.CanvasTexture(monitorCanvas);
+
+    const monFrame = new THREE.Mesh(
+      new THREE.BoxGeometry(3.2, 2.2, 0.12),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.7, roughness: 0.2 })
+    );
+    monFrame.position.set(2, 4.5, 0);
+    ozIsland.add(monFrame);
+
+    const monScreen = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.8, 1.8),
+      new THREE.MeshBasicMaterial({ map: monTex })
+    );
+    monScreen.position.set(2, 4.5, 0.07);
+    ozIsland.add(monScreen);
+
+    const monStand = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.07, 0.07, 1.2, 8),
+      new THREE.MeshStandardMaterial({ color: 0x334155 })
+    );
+    monStand.position.set(2, 3.4, 0);
+    ozIsland.add(monStand);
+
+    // Matrix-like code scroll
+    this.matrixLines = [];
+    const chars = '01アイウエオカキクケコABCDEFGHIJK{}[]()=>function const let';
+    const lineCount = 14;
+    for (let i = 0; i < lineCount; i++) {
+      this.matrixLines.push({
+        text: Array.from({length: 20}, () => chars[Math.floor(Math.random() * chars.length)]).join(''),
+        y: i * 17,
+        speed: 0.5 + Math.random() * 2,
+        color: Math.random() < 0.2 ? '#ffffff' : `hsl(120, 100%, ${30 + Math.random() * 40}%)`
+      });
+    }
+    this.matrixCanvas = monitorCanvas;
+    this.matrixCtx = mctx;
+    this.matrixTex = monTex;
+
+    // Spark particles for compile effect
+    this.codeSparks = [];
+    const sparkGeo = new THREE.BufferGeometry();
+    const sparkCount = 40;
+    const sparkPositions = new Float32Array(sparkCount * 3);
+    sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3));
+    const sparkMat = new THREE.PointsMaterial({ color: 0xfbbf24, size: 0.25, transparent: true, opacity: 0.9, depthWrite: false });
+    this.sparkParticles = new THREE.Points(sparkGeo, sparkMat);
+    this.sparkParticles.position.set(ozIsland.position.x + 2, 5, ozIsland.position.z);
+    this.scene.add(this.sparkParticles);
+    this.sparkParticles.userData.positions = sparkPositions;
+    for (let i = 0; i < sparkCount; i++) {
+      this.codeSparks.push({ x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, life: 0, maxLife: 0 });
+    }
+    this.sparkTimer = 0;
+    this.ozIslandRef = ozIsland;
+  }
+
+  updateMatrixTerminal(delta, time) {
+    if (!this.matrixCtx) return;
+    const ctx = this.matrixCtx;
+    const canvas = this.matrixCanvas;
+    ctx.fillStyle = 'rgba(0, 10, 0, 0.15)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.font = '11px monospace';
+    this.matrixLines.forEach(line => {
+      line.y += line.speed * delta * 20;
+      if (line.y > canvas.height + 10) {
+        line.y = -14;
+        line.text = Array.from({length: 20}, () => '01アイウエオABCDEF{}[]=>'.charAt(Math.floor(Math.random() * 25))).join('');
+        line.speed = 0.5 + Math.random() * 2;
+      }
+      // Randomize one char
+      const arr = line.text.split('');
+      arr[Math.floor(Math.random() * arr.length)] = '01アイウエオABCDEF{}[]=>'.charAt(Math.floor(Math.random() * 25));
+      line.text = arr.join('');
+      ctx.fillStyle = line.color;
+      ctx.fillText(line.text, 6, line.y);
+    });
+    // Cursor blink
+    if (Math.floor(time * 2) % 2 === 0) {
+      ctx.fillStyle = '#00ff41';
+      ctx.fillRect(6, 236, 12, 14);
+    }
+    this.matrixTex.needsUpdate = true;
+
+    // Spark effect (every 4 seconds)
+    this.sparkTimer = (this.sparkTimer || 0) + delta;
+    if (this.sparkTimer > 4 + Math.random() * 2) {
+      this.sparkTimer = 0;
+      // Emit sparks
+      const sp = this.codeSparks;
+      const ox = this.ozIslandRef ? this.ozIslandRef.position.x + 2 : 0;
+      const oz2 = this.ozIslandRef ? this.ozIslandRef.position.z : 0;
+      for (let i = 0; i < sp.length; i++) {
+        sp[i].x = ox; sp[i].y = 5; sp[i].z = oz2;
+        sp[i].vx = (Math.random() - 0.5) * 3;
+        sp[i].vy = 1 + Math.random() * 3;
+        sp[i].vz = (Math.random() - 0.5) * 3;
+        sp[i].life = 1; sp[i].maxLife = 1;
+      }
+    }
+    // Update sparks
+    const positions = this.sparkParticles.userData.positions;
+    this.codeSparks.forEach((sp, i) => {
+      if (sp.life > 0) {
+        sp.life -= delta * 1.5;
+        sp.x += sp.vx * delta; sp.y += sp.vy * delta; sp.z += sp.vz * delta;
+        sp.vy -= 5 * delta;
+      }
+      positions[i * 3] = sp.x;
+      positions[i * 3 + 1] = sp.life > 0 ? sp.y : -1000;
+      positions[i * 3 + 2] = sp.z;
+    });
+    this.sparkParticles.geometry.attributes.position.needsUpdate = true;
+    this.sparkParticles.material.opacity = 0.9;
+  }
+
+  // ---------- CONNECTION BEAMS ----------
+  createConnectionBeams() {
+    // Get island/agent positions lazily (called after everything is created)
+    this.agentBeams = [];
+
+    const beamDefs = [
+      { fromId: 'hitomi', toId: 'lineBot',        color: 0x22c55e, label: 'LINE' },
+      { fromId: 'hitomi', toId: 'slackBot',       color: 0x7c3aed, label: 'Slack' },
+      { fromId: 'hitomi', toId: 'tradingEngineer', color: 0xd4a017, label: 'Trading' },
+      { fromId: 'hitomi', toId: 'claudeCode',     color: 0x6366f1, label: 'Code' },
+    ];
+
+    beamDefs.forEach(bd => {
+      const beam = {
+        fromId: bd.fromId, toId: bd.toId,
+        color: bd.color, label: bd.label,
+        line: null, particles: null, particleProgress: [],
+        lastFrom: new THREE.Vector3(), lastTo: new THREE.Vector3()
+      };
+      // Create line
+      const points = [new THREE.Vector3(0,0,0), new THREE.Vector3(1,0,0)];
+      const geo = new THREE.BufferGeometry().setFromPoints(points);
+      const mat = new THREE.LineBasicMaterial({
+        color: bd.color, transparent: true, opacity: 0.6, linewidth: 2, depthWrite: false
+      });
+      const line = new THREE.Line(geo, mat);
+      this.scene.add(line);
+      beam.line = line;
+
+      // Particles along beam
+      const pCount = 8;
+      const pGeo = new THREE.BufferGeometry();
+      const pPos = new Float32Array(pCount * 3);
+      pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+      const pMat = new THREE.PointsMaterial({
+        color: bd.color, size: 0.35, transparent: true, opacity: 0.9, depthWrite: false
+      });
+      const points2 = new THREE.Points(pGeo, pMat);
+      this.scene.add(points2);
+      beam.particles = points2;
+      for (let i = 0; i < pCount; i++) beam.particleProgress.push(i / pCount);
+
+      this.agentBeams.push(beam);
+    });
+
+    // Joe -> hitomi rainbow beam (special)
+    const joeBeam = {
+      fromId: '__home__', toId: 'hitomi',
+      color: 0xff88ff, label: 'Joe→hitomi',
+      line: null, particles: null, particleProgress: [],
+      lastFrom: new THREE.Vector3(), lastTo: new THREE.Vector3()
+    };
+    const jgeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(1,0,0)]);
+    const jmat = new THREE.LineBasicMaterial({ vertexColors: false, color: 0xff88ff, transparent: true, opacity: 0.7, depthWrite: false });
+    joeBeam.line = new THREE.Line(jgeo, jmat);
+    this.scene.add(joeBeam.line);
+    const jpCount = 12;
+    const jpGeo = new THREE.BufferGeometry();
+    const jpPos = new Float32Array(jpCount * 3);
+    jpGeo.setAttribute('position', new THREE.BufferAttribute(jpPos, 3));
+    joeBeam.particles = new THREE.Points(jpGeo, new THREE.PointsMaterial({ color: 0xff88ff, size: 0.4, transparent: true, opacity: 0.9, depthWrite: false }));
+    for (let i = 0; i < jpCount; i++) joeBeam.particleProgress.push(i / jpCount);
+    this.scene.add(joeBeam.particles);
+    this.agentBeams.push(joeBeam);
+  }
+
+  updateConnectionBeams(delta, time) {
+    const homePosVec = PROJECTS[3].position; // HOME BASE
+    for (const beam of this.agentBeams) {
+      const fromAgent = beam.fromId === '__home__' ? null : this.agentLookup[beam.fromId];
+      const toAgent = beam.toId === '__home__' ? null : this.agentLookup[beam.toId];
+      const fromPos = fromAgent ? fromAgent.position : homePosVec;
+      const toPos = toAgent ? toAgent.position : homePosVec;
+
+      // Update line geometry
+      const steps = 16;
+      const linePositions = new Float32Array((steps + 1) * 3);
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        linePositions[i * 3] = fromPos.x + (toPos.x - fromPos.x) * t;
+        linePositions[i * 3 + 1] = fromPos.y + (toPos.y - fromPos.y) * t + Math.sin(t * Math.PI) * 4 + 2;
+        linePositions[i * 3 + 2] = fromPos.z + (toPos.z - fromPos.z) * t;
+      }
+      beam.line.geometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+      beam.line.geometry.attributes.position.needsUpdate = true;
+      // Pulse opacity
+      beam.line.material.opacity = 0.4 + 0.25 * Math.sin(time * 3 + this.agentBeams.indexOf(beam));
+
+      // Update particles
+      const pPos = beam.particles.geometry.attributes.position;
+      for (let i = 0; i < beam.particleProgress.length; i++) {
+        beam.particleProgress[i] += delta * 0.25;
+        if (beam.particleProgress[i] > 1) beam.particleProgress[i] -= 1;
+        const t = beam.particleProgress[i];
+        const px = fromPos.x + (toPos.x - fromPos.x) * t;
+        const py = fromPos.y + (toPos.y - fromPos.y) * t + Math.sin(t * Math.PI) * 4 + 2;
+        const pz = fromPos.z + (toPos.z - fromPos.z) * t;
+        pPos.setXYZ(i, px, py, pz);
+      }
+      pPos.needsUpdate = true;
+    }
+  }
+
+  // ---------- TASK PAPER ANIMATION ----------
+  launchTaskPaper(fromId, toId, label) {
+    // アイランドIDから座標を取得するヘルパー
+    const getPos = (id) => {
+      if (id === 'home') return PROJECTS.find(p => p.id === 'home')?.position || new THREE.Vector3(0,0,0);
+      if (this.agentLookup[id]) return this.agentLookup[id].position;
+      // 島のIDをチェック
+      const proj = PROJECTS.find(p => p.id === id);
+      if (proj) return proj.position;
+      return new THREE.Vector3(0, 0, 0);
+    };
+    const homePos = PROJECTS.find(p => p.id === 'home')?.position || new THREE.Vector3(0,0,0);
+    const fromPos = getPos(fromId).clone();
+    const toPos = getPos(toId).clone();
+    fromPos.y += 2; toPos.y += 2;
+
+    // Create paper mesh
+    const paperCanvas = document.createElement('canvas');
+    paperCanvas.width = 128; paperCanvas.height = 96;
+    const pctx = paperCanvas.getContext('2d');
+    pctx.fillStyle = '#fffbf0';
+    pctx.beginPath(); pctx.roundRect(4, 4, 120, 88, 8); pctx.fill();
+    pctx.strokeStyle = '#d4a017'; pctx.lineWidth = 2;
+    pctx.beginPath(); pctx.roundRect(4, 4, 120, 88, 8); pctx.stroke();
+    pctx.fillStyle = '#374151'; pctx.font = 'bold 12px sans-serif'; pctx.textAlign = 'center';
+    pctx.fillText('📄', 64, 38);
+    pctx.fillStyle = '#1e1b4b'; pctx.font = '10px sans-serif';
+    const words = label.split(' ');
+    words.forEach((w, i) => pctx.fillText(w, 64, 56 + i * 14));
+    const paperTex = new THREE.CanvasTexture(paperCanvas);
+    const paper = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.4, 1.0),
+      new THREE.MeshBasicMaterial({ map: paperTex, transparent: true, side: THREE.DoubleSide })
+    );
+    paper.position.copy(fromPos);
+    this.scene.add(paper);
+
+    const paperData = {
+      mesh: paper, fromPos: fromPos.clone(), toPos: toPos.clone(),
+      toId, fromId,
+      progress: 0, speed: 0.4 + Math.random() * 0.2, label,
+      done: false
+    };
+    this.taskPapers.push(paperData);
+  }
+
+  updateTaskPapers(delta, time) {
+    for (let i = this.taskPapers.length - 1; i >= 0; i--) {
+      const p = this.taskPapers[i];
+      p.progress += delta * p.speed;
+      if (p.progress >= 1) {
+        this.scene.remove(p.mesh);
+        this.taskPapers.splice(i, 1);
+        // Show arrival speech on target agent
+        const targetAgent = this.agentLookup[p.toId];
+        if (targetAgent) this.showAgentSpeech(targetAgent, '受取完了! ✅');
+        continue;
+      }
+      const t = p.progress;
+      p.mesh.position.x = p.fromPos.x + (p.toPos.x - p.fromPos.x) * t;
+      p.mesh.position.y = p.fromPos.y + (p.toPos.y - p.fromPos.y) * t + Math.sin(t * Math.PI) * 5;
+      p.mesh.position.z = p.fromPos.z + (p.toPos.z - p.fromPos.z) * t;
+      // Spin
+      p.mesh.rotation.z += delta * 3;
+      p.mesh.rotation.x = Math.sin(time * 4) * 0.3;
+      // Scale pulse on arrival
+      const scale = t > 0.8 ? 1 + (1 - (t - 0.8) / 0.2) * 0.5 : 1;
+      p.mesh.scale.setScalar(scale);
+    }
+  }
+
+  // ---------- LAUNCH DEMO TASKS (called periodically) ----------
+  startDemoTaskLoop() {
+    const taskRoutes = [
+      { from: 'lineBot', to: 'hitomi', label: 'LINE通知' },
+      { from: 'hitomi', to: 'claudeCode', label: 'OZ開発' },
+      { from: 'hitomi', to: 'tradingEngineer', label: '市場分析' },
+      { from: 'slackBot', to: 'hitomi', label: 'Slack通知' },
+      { from: 'hitomi', to: 'lineBot', label: '報告送信' },
+    ];
+    let routeIdx = 0;
+    const launchNext = () => {
+      const route = taskRoutes[routeIdx % taskRoutes.length];
+      routeIdx++;
+      this.launchTaskPaper(route.from, route.to, route.label);
+      // Show speech on source agent
+      const srcAgent = this.agentLookup[route.from];
+      if (srcAgent) this.showAgentSpeech(srcAgent, route.label + '送信中 📤');
+      setTimeout(launchNext, 8000 + Math.random() * 6000);
+    };
+    setTimeout(launchNext, 5000);
+  }
+
+  createAgentSpeechSprite(text) {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 512; canvas.height = 80;
+    ctx.clearRect(0, 0, 512, 80);
+    if (text) {
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.shadowColor = 'rgba(0,0,0,0.1)'; ctx.shadowBlur = 6;
+      ctx.beginPath(); ctx.roundRect(16, 4, 480, 52, 16); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = 'rgba(99,102,241,0.3)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.roundRect(16, 4, 480, 52, 16); ctx.stroke();
+      ctx.font = 'bold 20px "Noto Sans JP", sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#1e1b4b';
+      ctx.fillText(text, 256, 32);
+    }
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.minFilter = THREE.LinearFilter;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+    sprite.scale.set(7, 1.1, 1);
+    return sprite;
+  }
+
+  showAgentSpeech(agent, text) {
+    const sprite = agent.userData.speechSprite;
+    if (!sprite) return;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = 512; canvas.height = 80;
+    ctx.clearRect(0, 0, 512, 80);
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    ctx.shadowColor = 'rgba(0,0,0,0.1)'; ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.roundRect(16, 4, 480, 52, 16); ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(99,102,241,0.3)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(16, 4, 480, 52, 16); ctx.stroke();
+    ctx.font = 'bold 20px "Noto Sans JP", sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#1e1b4b';
+    ctx.fillText(text, 256, 32);
+    if (sprite.material.map) sprite.material.map.dispose();
+    sprite.material.map = new THREE.CanvasTexture(canvas);
+    sprite.material.map.minFilter = THREE.LinearFilter;
+    sprite.material.needsUpdate = true;
+    sprite.visible = true;
+  }
+
+  updateAgentCharacters(delta, time) {
+    const now = performance.now();
+    for (const agent of this.agentCharacters) {
+      const def = agent.userData.def;
+      const ud = agent.userData;
+
+      ud.floatPhase += delta * 2;
+      const floatY = Math.sin(ud.floatPhase) * 0.2;
+
+      if (now > ud.nextMoveTime) {
+        let targetIslandIndex = ud.homeIslandIndex;
+        if (def.visitOtherIslands && Math.random() < def.visitChance && ud.currentIslandIndex === ud.homeIslandIndex) {
+          targetIslandIndex = Math.floor(Math.random() * PROJECTS.length);
+        } else if (ud.currentIslandIndex !== ud.homeIslandIndex) {
+          targetIslandIndex = ud.homeIslandIndex;
+        }
+        ud.currentIslandIndex = targetIslandIndex;
+        const islandPos = PROJECTS[targetIslandIndex].position;
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 3 + Math.random() * def.patrolRadius;
+        ud.targetPos = new THREE.Vector3(islandPos.x + Math.cos(angle) * radius, 0.5, islandPos.z + Math.sin(angle) * radius);
+        ud.nextMoveTime = now + def.moveInterval[0] + Math.random() * (def.moveInterval[1] - def.moveInterval[0]);
+      }
+
+      const dx = ud.targetPos.x - agent.position.x;
+      const dz = ud.targetPos.z - agent.position.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+
+      if (dist > 1) {
+        const moveAmt = Math.min(def.speed * delta, dist);
+        agent.position.x += (dx / dist) * moveAmt;
+        agent.position.z += (dz / dist) * moveAmt;
+        const targetAngle = Math.atan2(dx, dz);
+        let angleDiff = targetAngle - agent.rotation.y;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        agent.rotation.y += angleDiff * 5 * delta;
+        agent.children[0].rotation.x = 0.15;
+      } else {
+        agent.children[0].rotation.x *= 0.9;
+      }
+
+      agent.position.y = 0.5 + floatY;
+
+      // Badge pulse
+      if (agent.userData.statusBadge) {
+        ud.badgePulsePhase = (ud.badgePulsePhase || 0) + delta * 3;
+        const bp = 0.7 + 0.3 * Math.sin(ud.badgePulsePhase);
+        agent.userData.statusBadge.material.opacity = ud.badgeStatus === 'busy' ? bp : (ud.badgeStatus === 'active' ? 0.9 + bp * 0.1 : 0.5);
+        agent.userData.statusBadge.scale.setScalar(ud.badgeStatus === 'active' ? 0.7 + bp * 0.05 : 0.7);
+      }
+
+      // Eye aura pulse for hitomi
+      if (agent.userData.eyeAuras) {
+        const ea = agent.userData.eyeAuras;
+        const p = 0.5 + 0.5 * Math.sin(time * 3 + ud.floatPhase);
+        ea.forEach(e => { e.material.opacity = 0.5 + p * 0.5; e.scale.setScalar(1 + p * 0.3); });
+      }
+
+      if (now > ud.nextSpeechTime) {
+        const speechText = def.speeches[Math.floor(Math.random() * def.speeches.length)];
+        this.showAgentSpeech(agent, speechText);
+        ud.speechEndTime = now + 3000;
+        ud.nextSpeechTime = now + def.speechInterval[0] + Math.random() * (def.speechInterval[1] - def.speechInterval[0]);
+      }
+      if (ud.speechEndTime > 0 && now > ud.speechEndTime) {
+        if (ud.speechSprite) ud.speechSprite.visible = false;
+        ud.speechEndTime = 0;
+      }
+    }
+  }
+
+  // ---------- INPUT ----------
+  setupInput() {
+    window.addEventListener('keydown', e => {
+      this.keys[e.key.toLowerCase()] = true;
+      if (e.key === ' ') e.preventDefault();
+      if (e.key === 'Enter' && this.nearIsland && !this.panelOpen) this.openPanel(this.nearIsland.userData.project);
+      if (e.key === 'Escape' && this.panelOpen) this.closePanel();
+      if (e.key.toLowerCase() === 'v' && !this.panelOpen) this.toggleFPSMode();
+      if (e.key === '+' || e.key === '=') this.handleZoom(-1);
+      if (e.key === '-' || e.key === '_') this.handleZoom(1);
+      // if (e.key.toLowerCase() === 'd') this.toggleDemoMode(); // デモモード無効化
+    });
+    window.addEventListener('keyup', e => { this.keys[e.key.toLowerCase()] = false; });
+
+    document.getElementById('panel-close').addEventListener('click', () => this.closePanel());
+    document.getElementById('detail-overlay').addEventListener('click', () => { if (this.panelOpen) this.closePanel(); });
+
+    // FPS mouse drag
+    this.renderer.domElement.addEventListener('mousedown', e => {
+      if (this.fpsMode && e.button === 0) { this.fpsDragging = true; this.fpsDragStart = { x: e.clientX, y: e.clientY }; }
+    });
+    window.addEventListener('mousemove', e => {
+      if (this.fpsMode && this.fpsDragging) {
+        const dx = e.clientX - this.fpsDragStart.x;
+        const dy = e.clientY - this.fpsDragStart.y;
+        this.fpsYaw -= dx * 0.003;
+        this.fpsPitch -= dy * 0.003;
+        this.fpsPitch = Math.max(-Math.PI * 0.45, Math.min(Math.PI * 0.45, this.fpsPitch));
+        this.fpsDragStart = { x: e.clientX, y: e.clientY };
+      }
+    });
+    window.addEventListener('mouseup', () => { this.fpsDragging = false; });
+
+    this.raycaster = new THREE.Raycaster();
+    this.mouse = new THREE.Vector2();
+
+    const handleClick = (clientX, clientY) => {
+      if (this.fpsMode) return;
+      const rect = this.renderer.domElement.getBoundingClientRect();
+      this.mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      this.mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+      this.raycaster.setFromCamera(this.mouse, this.camera);
+
+      // hitomiパネルメッシュのクリック判定
+      if (this.hitomiPanelMeshes && this.hitomiPanelMeshes.length) {
+        const hits = this.raycaster.intersectObjects(this.hitomiPanelMeshes, false);
+        if (hits.length > 0) {
+          const mesh = hits[0].object;
+          if (mesh.userData.onHitomiClick) { mesh.userData.onHitomiClick(); return; }
+          if (mesh.userData.hitomiPanel) { openHitomiFullscreen(mesh.userData.hitomiPanel); return; }
+        }
+      }
+
+      for (const island of this.islands) {
+        const intersects = this.raycaster.intersectObjects(island.children, true);
+        if (intersects.length > 0) {
+          const projId = island.userData.project?.id;
+          // hitomi-work島は全画面を開く
+          if (projId === 'hitomi-work') {
+            openHitomiFullscreen('cash'); return;
+          }
+          // 島をクリック→エージェントチャットUIを開く
+          if (projId && typeof openAgentChat !== 'undefined') {
+            const proj = island.userData.project;
+            openAgentChat(projId, proj.name + '(' + proj.nameJP + ')', proj.icon);
+          }
+          this.charTarget = island.position.clone(); this.charTarget.y = 0.5; return;
+        }
+      }
+    };
+
+    this.renderer.domElement.addEventListener('click', e => handleClick(e.clientX, e.clientY));
+
+    this.renderer.domElement.addEventListener('wheel', e => {
+      e.preventDefault();
+      this.handleZoom(e.deltaY > 0 ? 1 : -1);
+    }, { passive: false });
+
+    // Mobile
+    if (IS_MOBILE) {
+      const pad = document.getElementById('mobile-pad');
+      const knob = document.getElementById('pad-knob');
+      let padActive = false;
+      const padCenter = { x: 60, y: 60 };
+      pad.addEventListener('touchstart', e => { e.preventDefault(); padActive = true; });
+      pad.addEventListener('touchmove', e => {
+        e.preventDefault();
+        if (!padActive) return;
+        const touch = e.touches[0]; const rect = pad.getBoundingClientRect();
+        const x = touch.clientX - rect.left - padCenter.x;
+        const y = touch.clientY - rect.top - padCenter.y;
+        const dist = Math.sqrt(x * x + y * y); const maxDist = 36;
+        const clampedDist = Math.min(dist, maxDist);
+        const angle = Math.atan2(y, x);
+        const nx = Math.cos(angle) * clampedDist;
+        const ny = Math.sin(angle) * clampedDist;
+        knob.setAttribute('cx', 60 + nx); knob.setAttribute('cy', 60 + ny);
+        this.mobileDir.set(nx / maxDist, ny / maxDist);
+      });
+      const endPad = () => { padActive = false; knob.setAttribute('cx', 60); knob.setAttribute('cy', 60); this.mobileDir.set(0, 0); };
+      pad.addEventListener('touchend', endPad);
+      pad.addEventListener('touchcancel', endPad);
+      document.getElementById('mobile-interact').addEventListener('touchend', () => {
+        if (this.nearIsland && !this.panelOpen) this.openPanel(this.nearIsland.userData.project);
+        else if (this.panelOpen) this.closePanel();
+      });
+    }
+  }
+
+  // ---------- UI ----------
+  openPanel(project) {
+    this.panelOpen = true; this.currentProject = project;
+    this.audio.playUIOpen();
+    document.getElementById('panel-icon').textContent = project.icon;
+    document.getElementById('panel-title').textContent = project.name + ' — ' + project.nameJP;
+    document.getElementById('panel-desc').textContent = project.description;
+    const statusEl = document.getElementById('panel-status');
+    const statusLabels = { active: '稼働中', stalled: '停滞中', blocked: 'ブロック中' };
+    statusEl.textContent = statusLabels[project.status] || project.status;
+    statusEl.className = 'panel-status status-' + project.status;
+    document.getElementById('progress-pct').textContent = project.progress + '%';
+    const fill = document.getElementById('progress-fill');
+    fill.style.width = '0%';
+    const fillColors = { active: '#4338ca', stalled: '#d97706', blocked: '#dc2626' };
+    fill.style.background = fillColors[project.status] || '#4338ca';
+    setTimeout(() => { fill.style.width = project.progress + '%'; }, 100);
+    document.getElementById('panel-recent').innerHTML = project.recent.map(r => `<div class="info-item">${r}</div>`).join('');
+    document.getElementById('panel-next').innerHTML = project.next.map(n => `<div class="info-item">${n}</div>`).join('');
+    document.getElementById('panel-members').innerHTML = project.members.map(m => `<div class="member"><span class="member-dot"></span>${m}</div>`).join('');
+    document.getElementById('detail-panel').classList.add('open');
+    document.getElementById('detail-overlay').classList.add('open');
+  }
+
+  closePanel() {
+    this.panelOpen = false; this.currentProject = null;
+    this.audio.playUIClose();
+    document.getElementById('detail-panel').classList.remove('open');
+    document.getElementById('detail-overlay').classList.remove('open');
+  }
+
+  showNotification(text) {
+    const el = document.getElementById('notification');
+    el.textContent = text; el.style.opacity = '1';
+    setTimeout(() => { el.style.opacity = '0'; }, 2000);
+  }
+
+  updateClock() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2, '0');
+    const m = String(now.getMinutes()).padStart(2, '0');
+    const s = String(now.getSeconds()).padStart(2, '0');
+    document.getElementById('bar-clock').textContent = `${h}:${m}:${s}`;
+  }
+
+  updateAgentPanel() {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    const updateEl = document.getElementById('agent-update-time');
+    if (updateEl) updateEl.textContent = timeStr;
+    this.fetchHitomiBrowserStatus();
+  }
+
+  async fetchHitomiBrowserStatus() {
+    try {
+      const res = await fetch('/hitomi-status');
+      if (!res.ok) return;
+      const data = await res.json();
+      const panel = document.getElementById('hitomi-browser-status');
+      if (!panel) return;
+      if (data.active) {
+        panel.style.display = 'block';
+        const action = document.getElementById('hitomi-browser-action');
+        const url = document.getElementById('hitomi-browser-url');
+        const site = document.getElementById('hitomi-browser-site');
+        const progress = document.getElementById('hitomi-browser-progress');
+        if (action) action.textContent = data.action || '実行中';
+        if (url) url.textContent = data.url || '';
+        if (site) site.textContent = data.site || '';
+        if (progress) progress.style.width = (data.progress || 0) + '%';
+      } else {
+        panel.style.display = 'none';
+      }
+    } catch(e) {}
+  }
+
+  async pollHitomiStatus() {
+    try {
+      const res = await fetch('/hitomi-status');
+      if (!res.ok) return;
+      const data = await res.json();
+      const hitomiAgent = this.agentLookup['hitomi'];
+      if (!hitomiAgent) return;
+      const newStatus = data.active ? 'busy' : 'active';
+      if (hitomiAgent.userData.badgeStatus !== newStatus) {
+        hitomiAgent.userData.badgeStatus = newStatus;
+        // Recreate badge
+        if (hitomiAgent.userData.statusBadge) {
+          hitomiAgent.remove(hitomiAgent.userData.statusBadge);
+        }
+        const badge = this.createStatusBadge(newStatus);
+        badge.position.set(0.55, 2.25, 0);
+        hitomiAgent.add(badge);
+        hitomiAgent.userData.statusBadge = badge;
+      }
+      if (data.active && data.action) {
+        this.showAgentSpeech(hitomiAgent, data.action.substring(0, 20));
+        hitomiAgent.userData.speechEndTime = performance.now() + 4000;
+      }
+    } catch(e) {}
+  }
+
+  // ---------- UPWORK STATUS POLLING ----------
+  async pollUpworkStatus() {
+    try {
+      const res = await fetch('/upwork-status');
+      if (!res.ok) return;
+      const data = await res.json();
+
+      // OIMO FARM島のボードを更新
+      if (this.oimoIsland) {
+        const canvas = this.oimoIsland.userData.oimoBoardCanvas;
+        const tex = this.oimoIsland.userData.oimoBoardTex;
+        if (canvas && tex) {
+          const ctx = canvas.getContext('2d');
+          ctx.clearRect(0, 0, 512, 320);
+          ctx.fillStyle = '#1a0800';
+          ctx.fillRect(0, 0, 512, 320);
+          // タイトル
+          ctx.fillStyle = '#f97316';
+          ctx.font = 'bold 22px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('🥔 OIMO FARM — Upwork自動収益', 256, 32);
+          // 統計数値
+          ctx.fillStyle = '#fbbf24';
+          ctx.font = 'bold 28px sans-serif';
+          ctx.fillText('応募: ' + (data.total_applied || 0) + '件', 140, 80);
+          ctx.fillStyle = '#22c55e';
+          ctx.fillText('新着: ' + (data.last_processed || 0), 370, 80);
+          // 最新応募3件
+          ctx.fillStyle = '#a5b4fc';
+          ctx.font = '13px sans-serif';
+          ctx.textAlign = 'left';
+          ctx.fillText('— 直近の応募 —', 40, 115);
+          const recent = data.recent_applied || [];
+          recent.slice(0, 3).forEach((job, i) => {
+            ctx.fillStyle = '#e2e8f0';
+            ctx.font = '12px sans-serif';
+            const title = (job.title || '').substring(0, 38);
+            ctx.fillText('• ' + title, 40, 140 + i * 24);
+          });
+          // 最終チェック時刻
+          if (data.last_run) {
+            ctx.fillStyle = '#475569';
+            ctx.font = '11px sans-serif';
+            ctx.textAlign = 'right';
+            const t = new Date(data.last_run).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            ctx.fillText('最終: ' + t, 470, 305);
+          }
+          tex.needsUpdate = true;
+        }
+      }
+
+      // 応募件数が増えたらhitomi→oimoへタスクペーパーを飛ばす
+      const newCount = data.total_applied || 0;
+      if (newCount > this.lastAppliedCount && this.lastAppliedCount > 0) {
+        const diff = newCount - this.lastAppliedCount;
+        const latestJob = (data.recent_applied || [])[0];
+        const label = latestJob ? latestJob.title.substring(0, 18) + '応募!' : '新規応募 ' + diff + '件!';
+        this.launchTaskPaper('hitomi', 'oimo', label);
+        const hitomiAgent = this.agentLookup['hitomi'];
+        if (hitomiAgent) this.showAgentSpeech(hitomiAgent, 'Upwork応募完了! 👍');
+      }
+      this.lastAppliedCount = newCount;
+
+      // LIVEタブのUpworkパネルを更新
+      const liveEl = document.getElementById('live-upwork-panel');
+      if (liveEl) {
+        const recentHtml = (data.recent_applied || []).slice(0, 3).map(j =>
+          `<div style="color:#e2e8f0;font-size:11px;padding:3px 0;border-bottom:1px solid #1e293b">📌 ${(j.title||'').substring(0,40)}</div>`
+        ).join('');
+        liveEl.innerHTML = `
+          <div style="display:flex;gap:16px;margin-bottom:8px">
+            <div style="background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.3);border-radius:8px;padding:8px 14px;flex:1;text-align:center">
+              <div style="color:#f97316;font-size:22px;font-weight:900">${data.total_applied || 0}</div>
+              <div style="color:#64748b;font-size:10px">応募総数</div>
+            </div>
+            <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:8px;padding:8px 14px;flex:1;text-align:center">
+              <div style="color:#22c55e;font-size:22px;font-weight:900">${data.last_processed || 0}</div>
+              <div style="color:#64748b;font-size:10px">新着案件</div>
+            </div>
+            <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:8px;padding:8px 14px;flex:1;text-align:center">
+              <div style="color:#a5b4fc;font-size:22px;font-weight:900">${data.jobs_fetched || 0}</div>
+              <div style="color:#64748b;font-size:10px">利用可能案件</div>
+            </div>
+          </div>
+          <div style="color:#a5b4fc;font-size:11px;font-weight:700;margin-bottom:4px">直近の応募:</div>
+          ${recentHtml || '<div style="color:#475569;font-size:11px">応募なし</div>'}
+          <div style="color:#475569;font-size:10px;margin-top:6px;text-align:right">最終チェック: ${data.last_run ? new Date(data.last_run).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}) : '--'}</div>
+        `;
+      }
+    } catch(e) {}
+  }
+
+  // ---------- CALENDAR DATA (stub for /api/calendar) ----------
+  loadCalendarData() {
+    // スタブ実装: 実際には別サーバーの /api/calendar から取得する想定
+    const calendarEvents = [
+      { date: '4/2', title: 'ExNerve MTG', time: '13:00', today: true },
+      { date: '4/2', title: '樋口さんZoom', time: '11:00', today: true },
+      { date: '4/6', title: '東京会議収録', time: '14:30〜16:30', today: false },
+    ];
+    this.updateScheduleDisplay(calendarEvents);
+    // 5分ごとに再取得（スタブ）
+    setInterval(() => this.updateScheduleDisplay(calendarEvents), 5 * 60 * 1000);
+  }
+
+  updateScheduleDisplay(events) {
+    const el = document.getElementById('schedule-value');
+    if (!el) return;
+    const today = new Date();
+    const todayStr = `${today.getMonth() + 1}/${today.getDate()}`;
+    const todayEvents = events.filter(e => e.today || e.date === todayStr);
+    const futureEvents = events.filter(e => !e.today && e.date !== todayStr);
+    let parts = [];
+    if (todayEvents.length > 0) {
+      parts.push('📌 ' + todayEvents.map(e => `${e.title} ${e.time}`).join(' / '));
+    }
+    if (futureEvents.length > 0) {
+      parts.push(futureEvents.map(e => `${e.date} ${e.title} ${e.time}`).join(' | '));
+    }
+    el.textContent = parts.join(' | ') || '予定なし';
+  }
+
+  // ---------- GITHUB API ----------
+  async fetchGitHubCommit() {
+    try {
+      const res = await fetch('https://api.github.com/repos/joemekw-code/aplz/commits?per_page=1');
+      if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+      const data = await res.json();
+      if (data.length > 0) {
+        const commit = data[0];
+        const msg = commit.commit.message.split('\n')[0];
+        const date = new Date(commit.commit.author.date);
+        const dateStr = `${date.getMonth()+1}/${date.getDate()} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+        // APLZプロジェクトのstatusLineを更新
+        const aplzProj = PROJECTS.find(p => p.id === 'aplz');
+        if (aplzProj) {
+          aplzProj.statusLine = `最新: ${msg.substring(0, 20)} (${dateStr})`;
+          // ラベルスプライトを再生成
+          const aplzIsland = this.islands.find(g => g.userData.project.id === 'aplz');
+          if (aplzIsland) {
+            const oldSprite = aplzIsland.children.find(c => c.isSprite);
+            if (oldSprite) aplzIsland.remove(oldSprite);
+            const newSprite = this.createLabel(aplzProj);
+            newSprite.position.y = 14;
+            aplzIsland.add(newSprite);
+          }
+        }
+        console.log('GitHub commit loaded:', msg);
+      }
+    } catch (err) {
+      console.warn('GitHub API fetch failed:', err.message);
+      // フォールバック: デフォルトのstatusLineを維持
+    }
+    // 10分ごとに再取得
+    setTimeout(() => this.fetchGitHubCommit(), 10 * 60 * 1000);
+  }
+
+  updateMinimap() {
+    const canvas = document.getElementById('minimap');
+    const ctx = canvas.getContext('2d');
+    const w = 180, h = 120;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(219, 234, 254, 0.5)'; ctx.fillRect(0, 0, w, h);
+
+    const scale = 1.1;
+    const ox = w / 2, oy = h / 2;
+    const mapScale = (v, range) => v / range * (w / 2.8) * scale;
+
+    // Bridges
+    const homeProj = PROJECTS[3]; // HOME BASE
+    ctx.lineWidth = 1;
+    for (let i = 0; i < PROJECTS.length - 1; i++) {
+      const p = PROJECTS[i];
+      ctx.strokeStyle = `hsla(${(i / (PROJECTS.length - 1)) * 360}, 40%, 65%, 0.3)`;
+      ctx.beginPath();
+      ctx.moveTo(ox + mapScale(p.position.x, 60), oy + mapScale(p.position.z, 60));
+      ctx.lineTo(ox + mapScale(homeProj.position.x, 60), oy + mapScale(homeProj.position.z, 60));
+      ctx.stroke();
+    }
+
+    // Islands
+    PROJECTS.forEach((p, i) => {
+      const x = ox + mapScale(p.position.x, 60);
+      const y = oy + mapScale(p.position.z, 60);
+      const r = Math.round(p.color.r * 255), g = Math.round(p.color.g * 255), b = Math.round(p.color.b * 255);
+      const color = `rgb(${r},${g},${b})`;
+      const rad = p.id === 'home' ? 5 : 3.5;
+
+      ctx.globalAlpha = 0.3;
+      ctx.beginPath(); ctx.arc(x, y, rad + 2, 0, Math.PI * 2);
+      ctx.fillStyle = color; ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(x, y, rad, 0, Math.PI * 2); ctx.fill();
+    });
+
+    // Agents
+    const agentColors = { hitomi: '#a855f7', tradingEngineer: '#fbbf24', claudeCode: '#818cf8', lineBot: '#22c55e', slackBot: '#7c3aed' };
+    for (const agent of this.agentCharacters) {
+      const ax = ox + mapScale(agent.position.x, 60);
+      const ay = ox + mapScale(agent.position.z, 60);
+      const ac = agentColors[agent.userData.def.id] || '#94a3b8';
+      ctx.fillStyle = ac;
+      ctx.beginPath(); ctx.arc(ax, ay, 2, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Character
+    if (this.character) {
+      const cx = ox + mapScale(this.character.position.x, 60);
+      const cy = oy + mapScale(this.character.position.z, 60);
+      ctx.fillStyle = '#4338ca';
+      ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'rgba(67,56,202,0.4)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, 5, 0, Math.PI * 2); ctx.stroke();
+    }
+  }
+
+  // ---------- RESIZE ----------
+  onResize() {
+    this.camera.aspect = this.getAspect();
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(this.getWidth(), this.getHeight());
+  }
+
+  // ---------- VIEW MODE ----------
+  toggleFPSMode() {
+    if (this.cameraTransition > 0) return;
+    this.fpsMode = !this.fpsMode;
+    this.cameraTransitionFrom.copy(this.camera.position);
+    this.cameraTransitionLookFrom.copy(this.smoothCamTarget);
+    this.cameraTransition = this.cameraTransitionDuration;
+
+    if (this.fpsMode) {
+      this.fpsYaw = this.character.rotation.y;
+      this.fpsPitch = 0;
+      this.character.visible = false;
+      this.showNotification('一人称視点 — 飛行モード');
+    } else {
+      this.character.visible = true;
+      this.character.position.y = 0.5;
+      this.charVelocity.y = 0;
+      this.showNotification('俯瞰視点');
+    }
+    this.updateViewModeUI();
+  }
+
+  toggleDemoMode() {
+    if (this.demoMode) {
+      this.demoMode = false;
+      this.demoInterval && clearInterval(this.demoInterval);
+      this.showNotification('デモモード OFF');
+      return;
+    }
+    this.demoMode = true;
+    this.showNotification('🎬 デモモード ON — Dキーで停止');
+
+    // デモルート：各島を順番に巡回
+    const PROJECTS = window._OZ_PROJECTS || [];
+    const demoShots = [
+      // ショット1：タイトルかた全景ズームアウト
+      { pos: new THREE.Vector3(0, 180, 120), look: new THREE.Vector3(0, 0, 0), duration: 5000, label: '🌍 OZワールド' },
+      // ショット2：HOME BASEの微周回
+      { pos: new THREE.Vector3(15, 20, 35), look: new THREE.Vector3(0, 2, 10), duration: 4000, label: '🏠 HOME BASE' },
+      // ショット3：hitomiの目の高さから
+      { pos: new THREE.Vector3(2, 6, 20), look: new THREE.Vector3(0, 4, 10), duration: 3500, label: '👁️ hitomiの目線' },
+      // ショット4：HITOMI WORK島へドラマチックに接近
+      { pos: new THREE.Vector3(48, 18, 70), look: new THREE.Vector3(35, 2, 45), duration: 5000, label: '👁️ HITOMI WORK島' },
+      // ショット5：島内を近距離で見る
+      { pos: new THREE.Vector3(36, 8, 52), look: new THREE.Vector3(35, 3, 45), duration: 4000, label: '📊 モニター・掟示板' },
+      // ショット6：CASH ENGINEへ飛ぶ
+      { pos: new THREE.Vector3(-30, 25, 0), look: new THREE.Vector3(-50, 2, -30), duration: 4500, label: '💰 CASH ENGINE' },
+      // ショット7：TradingEngineerの目の前
+      { pos: new THREE.Vector3(-42, 7, -18), look: new THREE.Vector3(-50, 4, -30), duration: 3500, label: '📈 TradingEngineer' },
+      // ショット8：OZ WORLD島へ
+      { pos: new THREE.Vector3(-22, 22, 62), look: new THREE.Vector3(-35, 2, 45), duration: 4000, label: '🌐 OZ WORLD' },
+      // ショット9：ClaudeCodeのパソコンを近くから
+      { pos: new THREE.Vector3(-28, 6, 52), look: new THREE.Vector3(-35, 3, 45), duration: 3500, label: '💻 ClaudeCodeコーディング' },
+      // ショット10：島と島の間を飛ぶ
+      { pos: new THREE.Vector3(0, 30, 20), look: new THREE.Vector3(-20, 0, -10), duration: 4000, label: '✨ エージェントのなかま' },
+      // ショット11：フィナーレ全景ズームアウト
+      { pos: new THREE.Vector3(0, 150, 100), look: new THREE.Vector3(0, 0, 0), duration: 5000, label: '🎬 OZ — 全全オープニング' },
+    ];
+
+    let shotIdx = 0;
+    const nextShot = () => {
+      if (!this.demoMode) return;
+      const shot = demoShots[shotIdx % demoShots.length];
+      this.fpsMode = false;
+      this.character.visible = true;
+
+      // カメラをスムーズに移動
+      const startPos = this.camera.position.clone();
+      const startLook = this.smoothCamTarget ? this.smoothCamTarget.clone() : new THREE.Vector3(0,0,0);
+      let elapsed = 0;
+      const startTime = performance.now();
+
+      const animShot = () => {
+        if (!this.demoMode) return;
+        elapsed = performance.now() - startTime;
+        const t = Math.min(elapsed / (shot.duration * 0.6), 1);
+        const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t; // ease in-out
+
+        this.camera.position.lerpVectors(startPos, shot.pos, ease);
+        if (this.smoothCamTarget) this.smoothCamTarget.lerpVectors(startLook, shot.look, ease);
+        this.camera.lookAt(shot.look);
+
+        if (t < 1) {
+          requestAnimationFrame(animShot);
+        } else {
+          // ショット中は静止
+          setTimeout(() => {
+            shotIdx++;
+            nextShot();
+          }, shot.duration * 0.4);
+        }
+      };
+
+      this.showNotification('📍 ' + shot.label);
+      animShot();
+    };
+
+    nextShot();
+  }
+
+  updateViewModeUI() {
+    const el = document.getElementById('view-mode');
+    const crosshair = document.getElementById('crosshair');
+    if (this.fpsMode) {
+      el.innerHTML = '<span class="mode-label">飛行モード</span><br><span style="font-size:10px;color:#94a3b8">WASD:移動 Space:上昇 Shift:下降 V:切替</span>';
+      crosshair.classList.add('visible');
+    } else {
+      el.innerHTML = '<span class="mode-label">俯瞰</span><br><span style="font-size:10px;color:#94a3b8">ホイール:ズーム V:切替</span>';
+      crosshair.classList.remove('visible');
+    }
+  }
+
+  handleZoom(direction) {
+    if (this.fpsMode) return;
+    this.zoomLevel = Math.max(0.15, Math.min(5, this.zoomLevel + direction * 0.15));
+    this.cameraOffset.set(0, 65 * this.zoomLevel, 55 * this.zoomLevel);
+  }
+
+  // ---------- PROXIMITY POPUP ----------
+  updateProximityPopup() {
+    const popup = document.getElementById('proximity-popup');
+    if (this.nearIsland && !this.panelOpen) {
+      const proj = this.nearIsland.userData.project;
+      if (this.lastProximityIsland !== this.nearIsland) {
+        document.getElementById('popup-icon').textContent = proj.icon;
+        document.getElementById('popup-name').textContent = proj.name + ' — ' + proj.nameJP;
+        document.getElementById('popup-status').textContent = proj.statusBadge + ' ' + proj.statusLine;
+        this.lastProximityIsland = this.nearIsland;
+      }
+      popup.classList.add('visible');
+    } else {
+      popup.classList.remove('visible');
+      this.lastProximityIsland = null;
+    }
+  }
+
+  // ---------- ANIMATION LOOP ----------
+  animate() {
+    requestAnimationFrame(() => this.animate());
+    const delta = Math.min(this.clock.getDelta(), 0.05);
+    const time = this.clock.getElapsedTime();
+
+    this.updateCharacter(delta, time);
+    this.updateAgentCharacters(delta, time);
+    this.updateIslands(time, delta);
+    this.updateParticles(delta);
+    this.updateBridges(time, delta);
+    this.updateConnectionBeams(delta, time);
+    this.updateTaskPapers(delta, time);
+    this.updateMatrixTerminal(delta, time);
+    this.updateCamera(delta);
+    this.updateClouds(delta);
+    this.checkProximity();
+    this.updateProximityPopup();
+
+    if (Math.floor(time) !== Math.floor(time - delta)) this.updateClock();
+    if (Math.floor(time * 4) !== Math.floor((time - delta) * 4)) this.updateMinimap();
+
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  updateClouds(delta) {
+    if (!this.clouds) return;
+    for (const cloud of this.clouds) {
+      cloud.position.x += cloud.userData.speed * delta;
+      if (cloud.position.x > 130) cloud.position.x = -130;
+    }
+  }
+
+  updateCharacter(delta, time) {
+    if (!this.character) return;
+    const speed = this.fpsMode ? 27 : 18;
+    let moveX = 0, moveZ = 0, moveY = 0;
+
+    if (this.keys['w'] || this.keys['arrowup']) moveZ -= 1;
+    if (this.keys['s'] || this.keys['arrowdown']) moveZ += 1;
+    if (this.keys['a'] || this.keys['arrowleft']) moveX -= 1;
+    if (this.keys['d'] || this.keys['arrowright']) moveX += 1;
+
+    if (this.fpsMode) {
+      if (this.keys[' ']) moveY += 1;
+      if (this.keys['shift']) moveY -= 1;
+    }
+
+    if (IS_MOBILE) { moveX += this.mobileDir.x; moveZ += this.mobileDir.y; }
+
+    const hLen = Math.sqrt(moveX * moveX + moveZ * moveZ);
+    if (hLen > 0.1) {
+      moveX /= hLen; moveZ /= hLen;
+      this.charTarget = null;
+      let camAngle;
+      if (this.fpsMode) {
+        camAngle = this.fpsYaw + Math.PI;
+      } else {
+        // カメラ角度を固定：常に画面屋時を「対」とする
+        // W=画面対向(Z-)、S=手前(Z+)、A=左(X-)、D=右(X+)
+        camAngle = 0; // 固定
+      }
+      const cos = Math.cos(camAngle), sin = Math.sin(camAngle);
+      const rx = moveX * cos - moveZ * sin;
+      const rz = moveX * sin + moveZ * cos;
+      this.charVelocity.x = rx * speed;
+      this.charVelocity.z = rz * speed;
+      const targetAngle = Math.atan2(rx, rz);
+      if (!this.fpsMode) {
+        let angleDiff = targetAngle - this.character.rotation.y;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        this.character.rotation.y += angleDiff * 8 * delta;
+      }
+      this.isMoving = true;
+    } else if (this.charTarget) {
+      const dx = this.charTarget.x - this.character.position.x;
+      const dz = this.charTarget.z - this.character.position.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist > 2) {
+        this.charVelocity.x = (dx / dist) * speed;
+        this.charVelocity.z = (dz / dist) * speed;
+        const targetAngle = Math.atan2(dx, dz);
+        let angleDiff = targetAngle - this.character.rotation.y;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        this.character.rotation.y += angleDiff * 8 * delta;
+        this.isMoving = true;
+      } else {
+        this.charTarget = null;
+        this.charVelocity.set(0, 0, 0);
+        this.isMoving = false;
+      }
+    } else {
+      this.charVelocity.x *= 0.85;
+      this.charVelocity.z *= 0.85;
+      if (Math.abs(this.charVelocity.x) < 0.1 && Math.abs(this.charVelocity.z) < 0.1 && Math.abs(moveY) < 0.1) this.isMoving = false;
+    }
+
+    if (this.fpsMode) {
+      if (Math.abs(moveY) > 0.1) this.isMoving = true;
+      this.charVelocity.y = moveY * speed;
+      this.character.position.y += this.charVelocity.y * delta;
+      this.character.position.y = Math.max(0.5, Math.min(200, this.character.position.y));
+    }
+
+    this.character.position.x += this.charVelocity.x * delta;
+    this.character.position.z += this.charVelocity.z * delta;
+    this.character.position.x = THREE.MathUtils.clamp(this.character.position.x, -120, 120);
+    this.character.position.z = THREE.MathUtils.clamp(this.character.position.z, -120, 120);
+
+    // Walk animation
+    if (this.isMoving) {
+      this.walkPhase += delta * 10;
+      const swing = Math.sin(this.walkPhase) * 0.4;
+      if (!this.fpsMode) this.character.position.y = 0.5 + Math.abs(Math.sin(this.walkPhase)) * 0.15;
+      const ud = this.character.userData;
+      if (ud.body) ud.body.rotation.z = Math.sin(this.walkPhase) * 0.05;
+      if (ud.leftArm) ud.leftArm.rotation.x = swing;
+      if (ud.rightArm) ud.rightArm.rotation.x = -swing;
+      if (ud.leftLeg) ud.leftLeg.rotation.x = -swing;
+      if (ud.rightLeg) ud.rightLeg.rotation.x = swing;
+    } else {
+      if (!this.fpsMode) this.character.position.y = 0.5 + Math.sin(time * 2) * 0.1;
+      const ud = this.character.userData;
+      if (ud.body) ud.body.rotation.z = Math.sin(time * 1.5) * 0.02;
+      if (ud.leftArm) ud.leftArm.rotation.x *= 0.9;
+      if (ud.rightArm) ud.rightArm.rotation.x *= 0.9;
+      if (ud.leftLeg) ud.leftLeg.rotation.x *= 0.9;
+      if (ud.rightLeg) ud.rightLeg.rotation.x *= 0.9;
+    }
+  }
+
+  updateIslands(time, delta) {
+    this.islands.forEach((island, i) => {
+      // Gentle float
+      island.position.y = Math.sin(time * 0.4 + i * 0.7) * 1.2;
+
+      // Light pulse
+      const light = island.userData.light;
+      if (light) light.intensity = 0.6 + Math.sin(time * 1.5 + i) * 0.3;
+
+      // Child animations
+      island.children.forEach(child => {
+        if (child.userData.isFloater) {
+          child.position.y += Math.sin(time * child.userData.floatSpeed + child.userData.floatOffset) * 0.003;
+        }
+        if (child.userData.isRotator) {
+          child.rotation.y += 0.006;
+          child.rotation.x += 0.002;
+        }
+        if (child.userData.isOrbiter) {
+          const a = child.userData.orbitAngle + time * child.userData.orbitSpeed;
+          child.position.x = Math.cos(a) * child.userData.orbitRadius;
+          child.position.y = child.userData.orbitY + Math.sin(time + a) * 0.5;
+          child.position.z = Math.sin(a) * child.userData.orbitRadius;
+        }
+        if (child.userData.isChartBar) {
+          const bh = child.userData.baseHeight;
+          const newH = bh * (0.8 + Math.sin(time * 1.5 + child.position.x) * 0.3);
+          child.scale.y = newH / bh;
+          child.position.y = (newH / 2) + 0.3;
+        }
+      });
+    });
+  }
+
+  updateParticles(delta) {
+    if (!this.ambientParticles) return;
+    const positions = this.ambientParticles.geometry.attributes.position;
+    const vel = this.ambientParticleVelocities;
+    for (let i = 0; i < positions.count; i++) {
+      let x = positions.getX(i) + vel[i * 3];
+      let y = positions.getY(i) + vel[i * 3 + 1];
+      let z = positions.getZ(i) + vel[i * 3 + 2];
+      if (y > 30) { y = 0; x = (Math.random() - 0.5) * 200; z = (Math.random() - 0.5) * 200; }
+      positions.setXYZ(i, x, y, z);
+    }
+    positions.needsUpdate = true;
+  }
+
+  updateBridges(time, delta) {
+    this.bridgeLines.forEach(mesh => {
+      if (mesh.userData.curve) {
+        const positions = mesh.geometry.attributes.position;
+        const progress = mesh.userData.progress;
+        for (let i = 0; i < progress.length; i++) {
+          progress[i] += delta * 0.12;
+          if (progress[i] > 1) progress[i] -= 1;
+          const pt = mesh.userData.curve.getPoint(progress[i]);
+          positions.setXYZ(i, pt.x, pt.y, pt.z);
+        }
+        positions.needsUpdate = true;
+      }
+    });
+  }
+
+  updateCamera(delta) {
+    if (!this.character) return;
+
+    if (this.cameraTransition > 0) {
+      this.cameraTransition -= delta;
+      const t = 1 - Math.max(0, this.cameraTransition) / this.cameraTransitionDuration;
+      const ease = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+
+      let targetPos, targetLook;
+      if (this.fpsMode) {
+        const eyeHeight = 2.2;
+        targetPos = new THREE.Vector3(this.character.position.x, this.character.position.y + eyeHeight, this.character.position.z);
+        const lookDir = new THREE.Vector3(Math.sin(this.fpsYaw) * Math.cos(this.fpsPitch), Math.sin(this.fpsPitch), Math.cos(this.fpsYaw) * Math.cos(this.fpsPitch));
+        targetLook = targetPos.clone().add(lookDir.multiplyScalar(10));
+      } else {
+        targetPos = new THREE.Vector3(this.character.position.x + this.cameraOffset.x, this.cameraOffset.y, this.character.position.z + this.cameraOffset.z);
+        targetLook = new THREE.Vector3(this.character.position.x + this.cameraLookOffset.x, this.cameraLookOffset.y, this.character.position.z + this.cameraLookOffset.z);
+      }
+
+      this.camera.position.lerpVectors(this.cameraTransitionFrom, targetPos, ease);
+      this.smoothCamTarget.lerpVectors(this.cameraTransitionLookFrom, targetLook, ease);
+      this.camera.lookAt(this.smoothCamTarget);
+
+      if (this.cameraTransition <= 0) {
+        this.smoothCamPos.copy(this.camera.position);
+        this.cameraTransition = 0;
+      }
+      return;
+    }
+
+    if (this.fpsMode) {
+      const eyeHeight = 2.2;
+      const targetPos = new THREE.Vector3(this.character.position.x, this.character.position.y + eyeHeight, this.character.position.z);
+      this.smoothCamPos.lerp(targetPos, 8 * delta);
+      this.camera.position.copy(this.smoothCamPos);
+      const lookDir = new THREE.Vector3(Math.sin(this.fpsYaw) * Math.cos(this.fpsPitch), Math.sin(this.fpsPitch), Math.cos(this.fpsYaw) * Math.cos(this.fpsPitch));
+      const lookTarget = this.camera.position.clone().add(lookDir.multiplyScalar(10));
+      this.smoothCamTarget.lerp(lookTarget, 8 * delta);
+      this.camera.lookAt(this.smoothCamTarget);
+    } else {
+      const targetPos = new THREE.Vector3(this.character.position.x + this.cameraOffset.x, this.cameraOffset.y, this.character.position.z + this.cameraOffset.z);
+      const targetLook = new THREE.Vector3(this.character.position.x + this.cameraLookOffset.x, this.cameraLookOffset.y, this.character.position.z + this.cameraLookOffset.z);
+      this.smoothCamPos.lerp(targetPos, 3 * delta);
+      this.smoothCamTarget.lerp(targetLook, 3 * delta);
+      this.camera.position.copy(this.smoothCamPos);
+      this.camera.lookAt(this.smoothCamTarget);
+    }
+  }
+
+  checkProximity() {
+    if (!this.character) return;
+    let closest = null, closestDist = Infinity;
+    for (const island of this.islands) {
+      const dx = island.position.x - this.character.position.x;
+      const dz = island.position.z - this.character.position.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      const threshold = island.userData.project.id === 'home' ? 16 : 12;
+      if (dist < threshold && dist < closestDist) { closest = island; closestDist = dist; }
+    }
+
+    if (closest !== this.nearIsland) {
+      this.nearIsland = closest;
+      if (closest) {
+        this.audio.playChime(440 + closest.userData.index * 60);
+      }
+    }
+  }
+}
+
+// ============================================================
+// START
+// ============================================================
+
+const game = new OZGame();
+game.init().catch(err => {
+  console.error('OZ initialization error:', err);
+  document.getElementById('loading').innerHTML = `<p style="color:#dc2626">Error: ${err.message}</p>`;
+});
+
+</script>
+
+<!-- hitomiライブモニター -->
+<div id="hitomi-monitor" style="
+  display:none;
+  position:fixed;
+  bottom:20px;
+  left:20px;
+  width:380px;
+  background:rgba(15,12,41,0.95);
+  border:1px solid rgba(99,102,241,0.4);
+  border-radius:14px;
+  padding:14px;
+  z-index:9999;
+  box-shadow:0 8px 32px rgba(99,102,241,0.3);
+  backdrop-filter:blur(12px);
+  font-family:-apple-system,sans-serif;
+">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+    <span style="font-size:16px">👁️</span>
+    <span style="color:#fff;font-weight:700;font-size:13px">hitomi ブラウザ</span>
+    <span id="hm-site" style="margin-left:auto;color:#a5b4fc;font-size:11px"></span>
+    <div style="display:flex;align-items:center;gap:4px">
+      <div style="width:8px;height:8px;border-radius:50%;background:#22c55e;animation:pulse 1.5s infinite"></div>
+      <span style="color:#22c55e;font-size:10px;font-weight:700">LIVE</span>
+    </div>
+  </div>
+  <!-- ライブスクリーンショット -->
+  <div style="position:relative;border-radius:8px;overflow:hidden;margin-bottom:10px;border:1px solid rgba(99,102,241,0.2)">
+    <img id="hm-screenshot" src="" style="width:100%;display:block;border-radius:8px" />
+    <div style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,0.7));padding:6px 8px">
+      <div id="hm-url" style="color:#a5b4fc;font-size:9px;word-break:break-all"></div>
+    </div>
+  </div>
+  <!-- アクション表示 -->
+  <div style="background:rgba(99,102,241,0.1);border-radius:8px;padding:8px 10px">
+    <div id="hm-action" style="color:#e2e8f0;font-size:12px;font-weight:600">待機中</div>
+    <div style="margin-top:6px;background:rgba(255,255,255,0.1);border-radius:4px;height:4px">
+      <div id="hm-progress" style="height:100%;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:4px;transition:width 0.5s;width:0%"></div>
+    </div>
+  </div>
+  <div style="text-align:right;margin-top:6px">
+    <span id="hm-time" style="color:#475569;font-size:9px"></span>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// HITOMI FULLSCREEN OVERLAY
+// ============================================================
+function openHitomiFullscreen(tab) {
+  document.getElementById('hitomi-fullscreen').style.display = 'block';
+  hitomiShowTab(tab || 'cash');
+}
+function closeHitomiFullscreen() {
+  document.getElementById('hitomi-fullscreen').style.display = 'none';
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeHitomiFullscreen();
+});
+
+function hitomiShowTab(tab) {
+  document.querySelectorAll('.hf-tab').forEach(t => t.classList.remove('active'));
+  const idx = ['cash','jobs','arch','browser'].indexOf(tab);
+  if (idx >= 0) document.querySelectorAll('.hf-tab')[idx]?.classList.add('active');
+
+  const content = document.getElementById('hf-content');
+
+  if (tab === 'cash') {
+    content.innerHTML = `
+      <h2 style="color:#22c55e;margin:0 0 20px;font-size:20px">💰 CASH PLAN — 収益追跡</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:28px">
+        <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:12px;padding:18px">
+          <div style="color:#94a3b8;font-size:11px;margin-bottom:6px">Trading AI 今月損益</div>
+          <div style="color:#22c55e;font-size:28px;font-weight:900">+$1,084</div>
+          <div style="color:#64748b;font-size:11px;margin-top:4px">稼働中 • 毎朝7時LINEレポート</div>
+        </div>
+        <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:12px;padding:18px">
+          <div style="color:#94a3b8;font-size:11px;margin-bottom:6px">Upwork 収益</div>
+          <div style="color:#6366f1;font-size:28px;font-weight:900">$0</div>
+          <div style="color:#64748b;font-size:11px;margin-top:4px">プロフィール設定中 • $25/hr予定</div>
+        </div>
+        <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:12px;padding:18px">
+          <div style="color:#94a3b8;font-size:11px;margin-bottom:6px">総収益（今月）</div>
+          <div style="color:#fbbf24;font-size:28px;font-weight:900">$1,084</div>
+          <div style="color:#64748b;font-size:11px;margin-top:4px">目標: $5,000/月</div>
+        </div>
+      </div>
+      <h3 style="color:#a5b4fc;font-size:14px;margin:0 0 12px">📊 収益源別計画</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <tr style="color:#475569;border-bottom:1px solid #1e293b">
+          <td style="padding:8px">収益源</td><td>ステータス</td><td>現在値</td><td>目標</td><td>次のアクション</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b">
+          <td style="padding:8px;color:#fbbf24">💹 Trading AI</td>
+          <td><span style="color:#22c55e">● 稼働中</span></td>
+          <td style="color:#22c55e">+$1,084</td><td>$3,000/月</td>
+          <td style="color:#64748b">リスク管理最適化</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b">
+          <td style="padding:8px;color:#6366f1">🌍 Upwork</td>
+          <td><span style="color:#f59e0b">● 設定中</span></td>
+          <td style="color:#64748b">$0</td><td>$2,000/月</td>
+          <td style="color:#64748b">プロフィール100%完成→案件応募</td>
+        </tr>
+        <tr style="border-bottom:1px solid #1e293b">
+          <td style="padding:8px;color:#22c55e">🐻 Aplz</td>
+          <td><span style="color:#f59e0b">● PMF検証中</span></td>
+          <td style="color:#64748b">$0</td><td>SaaS買収 (~¥1億)</td>
+          <td style="color:#64748b">14人検証継続</td>
+        </tr>
+      </table>`,
+    }
+  else if (tab === 'jobs') {
+    // リアルデータを取得して表示
+    fetch('/upwork-status?t=' + Date.now()).then(r => r.json()).then(data => {
+      const recentHtml = (data.recent_applied || []).map(j =>
+        `<div style="background:rgba(255,255,255,0.04);border:1px solid #1e293b;border-radius:8px;padding:10px;margin-bottom:8px">
+          <div style="color:#e2e8f0;font-size:13px">${j.title || '?'}</div>
+          <div style="color:#64748b;font-size:11px;margin-top:3px">${j.applied_at ? new Date(j.applied_at).toLocaleString('ja-JP') : ''}</div>
+        </div>`
+      ).join('');
+      const lastRunStr = data.last_run ? new Date(data.last_run).toLocaleString('ja-JP') : '--';
+      content.innerHTML = `
+        <h2 style="color:#6366f1;margin:0 0 20px;font-size:20px">🥔 OIMO FARM — Upworkリアルデータ</h2>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px">
+          <div style="background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.3);border-radius:10px;padding:14px;text-align:center">
+            <div style="color:#f97316;font-size:30px;font-weight:900">${data.total_applied || 0}</div>
+            <div style="color:#64748b;font-size:11px">応募総数</div>
+          </div>
+          <div style="background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:10px;padding:14px;text-align:center">
+            <div style="color:#22c55e;font-size:30px;font-weight:900">${data.last_processed || 0}</div>
+            <div style="color:#64748b;font-size:11px">最終倒橋新着</div>
+          </div>
+          <div style="background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);border-radius:10px;padding:14px;text-align:center">
+            <div style="color:#a5b4fc;font-size:30px;font-weight:900">${data.jobs_fetched || 0}</div>
+            <div style="color:#64748b;font-size:11px">キャッシュ案件数</div>
+          </div>
+        </div>
+        <div style="color:#a5b4fc;font-size:12px;font-weight:700;margin-bottom:10px">📄 応募履歴 (${data.total_applied || 0}件)</div>
+        ${recentHtml || '<div style="color:#475569;font-size:12px">応募データなし</div>'}
+        <div style="color:#475569;font-size:11px;margin-top:14px">最終チェック: ${lastRunStr}</div>
+      `;
+    }).catch(() => {
+      content.innerHTML = '<div style="color:#ef4444;padding:40px">データ取得失敗</div>';
+    });
+    return;
+    // (従来のスタティック表示は已廃止)
+    content.innerHTML = `
+      <h2 style="color:#6366f1;margin:0 0 20px;font-size:20px">🌍 UPWORK 案件トラッカー</h2>
+      <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:12px;padding:16px;margin-bottom:20px">
+        <div style="color:#a5b4fc;font-size:12px;font-weight:700;margin-bottom:8px">プロフィール進捗</div>
+        <div style="background:#1e293b;border-radius:8px;height:10px;margin-bottom:6px">
+          <div style="background:linear-gradient(90deg,#6366f1,#a855f7);height:100%;border-radius:8px;width:60%;transition:width 1s"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;color:#64748b;font-size:11px">
+          <span>60% 完成</span><span>残り: Employment History / Portfolio / Education</span>
+        </div>
+      </div>
+      <div style="display:grid;gap:12px">
+        <div style="background:rgba(255,255,255,0.04);border:1px solid #1e293b;border-radius:10px;padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="color:#22c55e">●</span>
+            <span style="color:#e2e8f0;font-weight:700">Overview / Bio</span>
+            <span style="margin-left:auto;color:#22c55e;font-size:11px">入力済</span>
+          </div>
+          <div style="color:#64748b;font-size:12px">「AI Developer & Automation Engineer」 — 英語自己紹介文入力済み</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.04);border:1px solid #1e293b;border-radius:10px;padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="color:#f59e0b">●</span>
+            <span style="color:#e2e8f0;font-weight:700">Employment History</span>
+            <span style="margin-left:auto;color:#f59e0b;font-size:11px">要入力 (+20%)</span>
+          </div>
+          <div style="color:#64748b;font-size:12px">Undelry Inc. / FastNeura 入力待ち</div>
+        </div>
+        <div style="background:rgba(255,255,255,0.04);border:1px solid #1e293b;border-radius:10px;padding:14px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="color:#f59e0b">●</span>
+            <span style="color:#e2e8f0;font-weight:700">Portfolio</span>
+            <span style="margin-left:auto;color:#f59e0b;font-size:11px">要入力 (+20%)</span>
+          </div>
+          <div style="color:#64748b;font-size:12px">くまモンAI / Aplz / tilla 実績追加</div>
+        </div>
+      </div>
+      <div style="margin-top:20px;padding:14px;background:rgba(99,102,241,0.08);border-radius:10px;border:1px solid rgba(99,102,241,0.2)">
+        <div style="color:#a5b4fc;font-size:12px;font-weight:700;margin-bottom:6px">✨ 案件取得戰略</div>
+        <div style="color:#64748b;font-size:12px;line-height:1.7">
+          プロフィール100%完成 → Claude/AI Integration系案件に応募 → 初案件は$15-20で実績作り → レビュー獲得後に$25+へ引き上げ
+        </div>
+      </div>`
+  }
+  else if (tab === 'arch') {
+    content.innerHTML = `
+      <h2 style="color:#a855f7;margin:0 0 20px;font-size:20px">🕷️ AI アーキテクチャ — リアルタイム</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div>
+          <h3 style="color:#38bdf8;font-size:13px;margin:0 0 12px">📡 入力チャンネル</h3>
+          <div style="display:grid;gap:8px">
+            ${ [['Telegram','メイン会話チャンネル','●','#22c55e'],
+               ['LINE','受信・返信OK','●','#22c55e'],
+               ['Slack (Undelry)','チーム共有・監視','●','#22c55e']]
+              .map(([n,d,dot,c]) => `<div style="background:rgba(255,255,255,0.04);border:1px solid #1e293b;border-radius:8px;padding:10px;display:flex;align-items:center;gap:10px">
+                <span style="color:${c}">${dot}</span>
+                <div><div style="color:#e2e8f0;font-size:13px">${n}</div><div style="color:#64748b;font-size:11px">${d}</div></div></div>`).join('') }
+          </div>
+        </div>
+        <div>
+          <h3 style="color:#a5b4fc;font-size:13px;margin:0 0 12px">🤖 hitomiの武器</h3>
+          <div style="display:grid;gap:8px">
+            ${ [['Gmail API','定期チェック','●','#22c55e'],
+               ['Slack Bot','読み書き','●','#22c55e'],
+               ['Google Calendar','予定管理','●','#22c55e'],
+               ['GitHub CLI','リポジトリ','●','#22c55e'],
+               ['Playwright','Upwork自動化','●','#22c55e'],
+               ['PyAutoGUI','OS制御','●','#22c55e'],
+               ['LINE Webhook','受信中','●','#22c55e']]
+              .map(([n,d,dot,c]) => `<div style="background:rgba(255,255,255,0.04);border:1px solid #1e293b;border-radius:8px;padding:10px;display:flex;align-items:center;gap:10px">
+                <span style="color:${c}">${dot}</span>
+                <div><div style="color:#e2e8f0;font-size:13px">${n}</div><div style="color:#64748b;font-size:11px">${d}</div></div></div>`).join('') }
+          </div>
+        </div>
+      </div>`
+  }
+  else if (tab === 'browser') {
+    fetch('/hitomi-status?t=' + Date.now()).then(r => r.json()).then(data => {
+      content.innerHTML = `
+        <h2 style="color:#22c55e;margin:0 0 20px;font-size:20px">📹 LIVE ブラウザ — hitomiの今</h2>
+        <div style="background:${ data.active ? 'rgba(34,197,94,0.08)' : 'rgba(100,116,139,0.08)' };border:1px solid ${ data.active ? 'rgba(34,197,94,0.3)' : '#1e293b' };border-radius:12px;padding:16px;margin-bottom:20px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <div style="width:10px;height:10px;border-radius:50%;background:${ data.active ? '#22c55e' : '#475569' }"></div>
+            <span style="color:#e2e8f0;font-weight:700">${ data.active ? 'ブラウザ稼働中' : '待機中' }</span>
+            <span style="margin-left:auto;color:#64748b;font-size:12px">${ data.site || '' }</span>
+          </div>
+          ${ data.active ? `<div style="color:#a5b4fc;font-size:13px;margin-bottom:6px">▶ ${ data.action || '' }</div><div style="color:#475569;font-size:11px;word-break:break-all">${ data.url || '' }</div>` : '' }
+        </div>
+        ${ data.active ? `<img src="/hitomi-screenshot?t=${Date.now()}" style="width:100%;max-height:70vh;object-fit:contain;border-radius:8px;border:1px solid #1e293b" />` : '<div style="color:#475569;text-align:center;padding:80px">hitomiブラウザはオフラインです</div>' }`
+    }).catch(() => { content.innerHTML = '<div style="color:#475569;padding:40px">ステータス取得失敗</div>'; });
+  }
+}
+
+// ============================================================
+// hitomiライブモニター
+// ============================================================
+(function() {
+  let lastScreenshot = '';
+  let pollInterval = null;
+
+  function startMonitor() {
+    pollInterval = setInterval(async () => {
+      try {
+        const res = await fetch('/hitomi-status?t=' + Date.now());
+        if (!res.ok) return;
+        const data = await res.json();
+        const monitor = document.getElementById('hitomi-monitor');
+        if (!monitor) return;
+
+        if (data.active) {
+          monitor.style.display = 'block';
+          document.getElementById('hm-action').textContent = data.action || '実行中';
+          document.getElementById('hm-url').textContent = data.url || '';
+          document.getElementById('hm-site').textContent = data.site || '';
+          document.getElementById('hm-progress').style.width = (data.progress || 0) + '%';
+          document.getElementById('hm-time').textContent = data.timestamp ? new Date(data.timestamp).toLocaleTimeString('ja-JP') : '';
+
+          // スクリーンショットを更新
+          const imgEl = document.getElementById('hm-screenshot');
+          if (imgEl) {
+            imgEl.src = '/hitomi-screenshot?t=' + Date.now();
+          }
+        } else {
+          monitor.style.display = 'none';
+        }
+      } catch(e) {}
+    }, 2000); // 2秒ごとに更新
+  }
+
+  // DOM読み込み後に開始
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startMonitor);
+  } else {
+    startMonitor();
+  }
+})();
+</script>
+
+<!-- ============================================================
+     エージェントチャットUI
+     ============================================================ -->
+<div id="agent-chat-ui" style="
+  display:none;
+  position:fixed;
+  bottom:20px;
+  left:50%;
+  transform:translateX(-50%);
+  z-index:200;
+  width:min(440px, 90vw);
+  background:rgba(15,12,41,0.97);
+  border:1px solid rgba(99,102,241,0.5);
+  border-radius:16px;
+  padding:16px 18px;
+  box-shadow:0 8px 40px rgba(99,102,241,0.4);
+  backdrop-filter:blur(16px);
+  font-family:'Noto Sans JP',sans-serif;
+">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+    <span id="chat-agent-icon" style="font-size:22px">👁️</span>
+    <span id="chat-agent-name" style="color:#e0e7ff;font-weight:700;font-size:14px">hitomi と話す</span>
+    <button onclick="document.getElementById('agent-chat-ui').style.display='none'" style="margin-left:auto;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);color:#94a3b8;border-radius:8px;padding:4px 10px;cursor:pointer;font-size:12px">閉じる</button>
+  </div>
+  <div style="display:flex;gap:8px">
+    <input id="chat-input" placeholder="メッセージを入力..." style="
+      flex:1;
+      background:rgba(99,102,241,0.1);
+      border:1px solid rgba(99,102,241,0.3);
+      border-radius:10px;
+      padding:10px 14px;
+      color:#e0e7ff;
+      font-size:13px;
+      font-family:inherit;
+      outline:none;
+    " />
+    <button id="chat-send" style="
+      background:linear-gradient(135deg,#6366f1,#a855f7);
+      border:none;
+      border-radius:10px;
+      color:#fff;
+      font-size:13px;
+      font-weight:700;
+      padding:10px 16px;
+      cursor:pointer;
+      white-space:nowrap;
+    ">送信 →</button>
+  </div>
+  <div id="chat-status" style="color:#64748b;font-size:11px;margin-top:6px;min-height:16px"></div>
+</div>
+
+<script>
+// エージェントチャットUIの制御
+let currentChatAgentId = 'hitomi';
+
+function openAgentChat(agentId, agentName, agentIcon) {
+  currentChatAgentId = agentId || 'hitomi';
+  document.getElementById('chat-agent-name').textContent = (agentName || agentId) + ' と話す';
+  document.getElementById('chat-agent-icon').textContent = agentIcon || '👁️';
+  document.getElementById('chat-input').value = '';
+  document.getElementById('chat-status').textContent = '';
+  document.getElementById('agent-chat-ui').style.display = 'block';
+  document.getElementById('chat-input').focus();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const sendBtn = document.getElementById('chat-send');
+  const inputEl = document.getElementById('chat-input');
+  const statusEl = document.getElementById('chat-status');
+
+  async function sendMessage() {
+    const msg = inputEl.value.trim();
+    if (!msg) return;
+    sendBtn.disabled = true;
+    statusEl.textContent = '送信中...';
+    try {
+      const res = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agentId: currentChatAgentId, message: msg })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        statusEl.style.color = '#22c55e';
+        statusEl.textContent = '✅ 送信完了!';
+        inputEl.value = '';
+        setTimeout(() => {
+          statusEl.textContent = '';
+          document.getElementById('agent-chat-ui').style.display = 'none';
+        }, 1500);
+      } else {
+        statusEl.style.color = '#ef4444';
+        statusEl.textContent = '❌ 失敗: ' + (data.error || '不明なエラー');
+      }
+    } catch(e) {
+      statusEl.style.color = '#ef4444';
+      statusEl.textContent = '❌ 通信エラー';
+    }
+    sendBtn.disabled = false;
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') sendMessage(); });
+});
+</script>
+</body>
+</html>
