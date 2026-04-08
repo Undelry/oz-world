@@ -92,26 +92,33 @@ def _gate(agent: str, action: str, detail: str) -> Optional[dict]:
 # ================================
 def _handle_agent_ask(params: dict) -> dict:
     """
-    Have a worker call Claude. Charges 5 OZC on success.
-    Imports oz_agents lazily so a runtime restart doesn't break the import
-    cycle if oz_agents grows imports of its own.
+    Have a worker call Claude via Claude Code CLI subprocess.
+
+    Each worker is a Claude Code subprocess with its own profile:
+    - allowed_tools (e.g. coder gets Read/Edit/Write, researcher gets WebFetch)
+    - system prompt (persona + vault context)
+    - working directory (file scope)
+
+    The CLI handles its own permission prompts; OZ adds:
+    - capability-level gate (which agents can be invoked at all)
+    - economy charge (OZC per call)
+    - vault session log (persistent memory)
     """
-    import oz_agents
+    import oz_agents_cli
 
     agent = str(params.get("agent", ""))[:64]
     message = (params.get("message") or "")[:MAX_PROMPT_CHARS]
     if not agent or not message:
         return {"ok": False, "error": "agent and message required"}
 
-    if agent not in oz_agents.WORKER_PERSONALITIES:
+    if agent not in oz_agents_cli.WORKER_PROFILES:
         return {"ok": False, "error": "unknown agent"}
 
     gate = _gate(agent, "llm.claude", message[:60])
     if gate is not None:
         return gate
 
-    # ask_agent already enforces the OZ economy charge
-    return oz_agents.ask_agent(agent, message, timeout=LLM_TIMEOUT)
+    return oz_agents_cli.ask_agent(agent, message, timeout=90)
 
 
 def _handle_speak(params: dict) -> dict:

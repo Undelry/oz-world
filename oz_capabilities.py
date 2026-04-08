@@ -127,6 +127,24 @@ WORKER_CAPABILITIES: dict[str, dict[str, Permission]] = {
         "shell.exec":      Permission.DENY,
         "file.delete":     Permission.DENY,
     },
+    # macOS-bridge: Bash + osascript via Claude CLI
+    # User approval is enforced by Claude Code CLI's own permission prompts.
+    # OZ-level gate just makes sure the agent can be invoked at all.
+    "macos-bridge": {
+        "llm.claude":      Permission.ALWAYS,
+        "tts.speak":       Permission.ALWAYS,
+        "macos.app.list":     Permission.ALWAYS,
+        "macos.app.running":  Permission.ALWAYS,
+        "macos.window.active": Permission.ALWAYS,
+        "macos.app.focus":    Permission.ALWAYS,
+        "macos.app.launch":   Permission.USER_APPROVE,
+        "macos.app.quit":     Permission.USER_APPROVE,
+        # Bashツールは Claude Code 側で個別承認
+        "shell.exec":      Permission.USER_APPROVE,
+        # 外部通信もNG (macos操作だけ)
+        "external.http":   Permission.DENY,
+        "file.delete":     Permission.DENY,
+    },
     # 外部AIプロバイダー (ゲストエージェント) は最小権限
     # 入札に勝ってOZに招待されたら、LLM呼び出しだけ許可される
     # (ファイル・コード・外部通信などは一切不可)
