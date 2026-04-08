@@ -1,7 +1,7 @@
 """
 oz_webserver.py - OZ World HTMLビューアー用HTTPサーバー
 - oz_world.html を http://localhost:8767/oz_world.html で配信
-- ワークスペースディレクトリの静的ファイルを配信
+- /api/transcribe: Whisperローカル音声認識
 """
 
 import http.server
@@ -10,11 +10,29 @@ import os
 import sys
 import signal
 import json
+import tempfile
+import threading
+import subprocess
 
 PORT = 8767
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 TASK_STATUS_FILE = os.path.join(DIRECTORY, "openclaw_task_status.json")
 WORKER_STATE_FILE = os.path.join(DIRECTORY, "oz_worker_state.json")
+
+# Whisper model (lazy load)
+_whisper_model = None
+_whisper_lock = threading.Lock()
+
+def get_whisper_model():
+    global _whisper_model
+    if _whisper_model is None:
+        with _whisper_lock:
+            if _whisper_model is None:
+                import whisper
+                print("Loading Whisper model (base)...")
+                _whisper_model = whisper.load_model("base")
+                print("Whisper model ready")
+    return _whisper_model
 
 
 class OZHandler(http.server.SimpleHTTPRequestHandler):
@@ -74,6 +92,49 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"error": str(e)}, status=400)
             return
 
+        if self.path == "/api/speak":
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            try:
+                data = json.loads(body)
+                text = data.get("text", "")
+                voice = data.get("voice", "Kyoko")  # Kyoko=日本語, Samantha=英語
+                rate = data.get("rate", 200)
+                if text:
+                    # Non-blocking TTS via macOS say
+                    subprocess.Popen(
+                        ["say", "-v", voice, "-r", str(rate), text],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                    )
+                self._send_json({"ok": True})
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, status=500)
+            return
+
+        if self.path == "/api/transcribe":
+            content_length = int(self.headers.get("Content-Length", 0))
+            audio_data = self.rfile.read(content_length)
+            try:
+                # Save audio to temp file
+                with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
+                    tmp.write(audio_data)
+                    tmp_path = tmp.name
+
+                # Transcribe with Whisper
+                model = get_whisper_model()
+                result = model.transcribe(tmp_path, language="ja", fp16=False)
+                text = result.get("text", "").strip()
+
+                # Cleanup
+                os.unlink(tmp_path)
+
+                print(f"  Transcribed: {text}")
+                self._send_json({"ok": True, "text": text})
+            except Exception as e:
+                print(f"  Transcribe error: {e}")
+                self._send_json({"ok": False, "error": str(e)}, status=500)
+            return
+
         self.send_error(404)
 
     def do_OPTIONS(self):
@@ -84,8 +145,8 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
 
-class ReusableTCPServer(socketserver.TCPServer):
-    """allow_reuse_address を server_bind() の前に有効化する TCPServer"""
+class ReusableTCPServer(http.server.ThreadingHTTPServer):
+    """Threading + allow_reuse_address"""
     allow_reuse_address = True
 
 

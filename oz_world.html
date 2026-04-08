@@ -291,6 +291,130 @@
   }
   .oz-notification.show { opacity: 1; }
 
+  /* === Voice Control === */
+  .voice-mic {
+    display: flex; align-items: center; gap: 6px;
+    padding: 3px 10px;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.3s;
+    background: rgba(0,0,0,0.04);
+    border: 1px solid transparent;
+  }
+  .voice-mic.listening {
+    background: rgba(17, 138, 178, 0.12);
+    border-color: rgba(17, 138, 178, 0.3);
+  }
+  .voice-mic.always-on {
+    background: rgba(6, 214, 160, 0.12);
+    border-color: rgba(6, 214, 160, 0.3);
+  }
+  .voice-mic-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #ccc;
+    transition: all 0.3s;
+  }
+  .voice-mic.listening .voice-mic-dot {
+    background: #118ab2;
+    animation: micPulse 1s infinite;
+  }
+  .voice-mic.always-on .voice-mic-dot {
+    background: #06d6a0;
+    animation: micPulse 1.5s infinite;
+  }
+  @keyframes micPulse {
+    0%, 100% { box-shadow: 0 0 4px currentColor; transform: scale(1); }
+    50% { box-shadow: 0 0 10px currentColor; transform: scale(1.3); }
+  }
+  .voice-mic-label {
+    font-size: 10px;
+    color: rgba(0,0,0,0.4);
+  }
+  .voice-mic.listening .voice-mic-label { color: #118ab2; }
+  .voice-mic.always-on .voice-mic-label { color: #06d6a0; }
+
+  #voiceTranscript {
+    position: fixed;
+    bottom: 52px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(17, 138, 178, 0.2);
+    border-radius: 20px;
+    padding: 8px 20px;
+    font-size: 13px;
+    color: #333;
+    z-index: 95;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    max-width: 500px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #voiceTranscript.show { opacity: 1; }
+  #voiceTranscript .transcript-prefix {
+    color: #118ab2;
+    font-weight: 600;
+    margin-right: 6px;
+  }
+
+  /* === Voice Input UI === */
+  #voicePanel {
+    position: fixed;
+    bottom: 52px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  #voicePanel.show { display: flex; }
+  #voiceStatus {
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(16px);
+    border-radius: 24px;
+    padding: 12px 24px;
+    font-size: 14px;
+    color: #333;
+    border: 2px solid #118ab2;
+    box-shadow: 0 6px 30px rgba(17, 138, 178, 0.15);
+    text-align: center;
+    min-width: 300px;
+  }
+  #voicePanel.recording #voiceStatus {
+    border-color: #ff4d6d;
+    animation: recPulse 1s infinite;
+  }
+  @keyframes recPulse {
+    0%, 100% { box-shadow: 0 6px 30px rgba(255, 77, 109, 0.2); }
+    50% { box-shadow: 0 6px 40px rgba(255, 77, 109, 0.4); }
+  }
+  #voicePanel.processing #voiceStatus {
+    border-color: #ffa040;
+  }
+  #voiceTextInput {
+    display: flex;
+    width: 100%;
+  }
+  #voiceTextInput input {
+    width: 400px;
+    padding: 10px 16px;
+    border: 2px solid rgba(17, 138, 178, 0.3);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.96);
+    font-size: 14px;
+    font-family: 'Inter', sans-serif;
+    color: #333;
+    outline: none;
+  }
+  #voiceTextInput input:focus { border-color: #118ab2; }
+
   /* === Dialog Bubble === */
   #dialogBubble {
     position: fixed;
@@ -460,12 +584,29 @@
   <span class="ctrl-key">V</span><span class="ctrl-label">1st/3rd Person</span>
   <span class="ctrl-key">Space</span><span class="ctrl-label">Jump</span>
   <span class="ctrl-key">E</span><span class="ctrl-label">Talk</span>
+  <span class="ctrl-key">T</span><span class="ctrl-label">Voice</span>
+  <span class="ctrl-key">/</span><span class="ctrl-label">Text</span>
+  <div class="voice-mic" id="voiceMic" title="Voice Control">
+    <div class="voice-mic-dot"></div>
+    <span class="voice-mic-label" id="voiceMicLabel">OFF</span>
+  </div>
   <span class="spacer"></span>
   <span class="position-info" id="posInfo">x:0 y:0 z:0</span>
 </div>
 
 <!-- Notification -->
 <div class="oz-notification" id="notification"></div>
+
+<!-- Voice Transcript Overlay -->
+<div id="voiceTranscript"><span class="transcript-prefix">🎤</span><span id="transcriptText"></span></div>
+
+<!-- Voice Panel -->
+<div id="voicePanel">
+  <div id="voiceStatus">🎤 Tで録音開始 / テキスト入力もOK</div>
+  <div id="voiceTextInput">
+    <input type="text" id="voiceInput" placeholder="コマンドを入力してEnter (例: coderに行って)" autocomplete="off">
+  </div>
+</div>
 
 <!-- Dialog Bubble -->
 <div id="dialogBubble">
@@ -1777,11 +1918,14 @@ function updateDialogContent(worker, page) {
   skillsEl.innerHTML = '';
   optionsEl.innerHTML = '';
 
+  let spokenText = '';
+
   if (page === 0) {
     // Greeting
     roleEl.textContent = worker.state === 'coding' ? 'Working' : worker.state === 'relaxing' ? 'On Break' : worker.state;
     const greeting = wType.greetings[Math.floor(Math.random() * wType.greetings.length)];
     textEl.textContent = greeting;
+    spokenText = greeting;
 
     optionsEl.innerHTML = `
       <div class="dialog-option" data-action="task">What are you working on?</div>
@@ -1794,6 +1938,7 @@ function updateDialogContent(worker, page) {
     roleEl.textContent = 'Current Task';
     const taskText = wType.dialogues[Math.floor(Math.random() * wType.dialogues.length)];
     textEl.textContent = taskText;
+    spokenText = taskText;
     optionsEl.innerHTML = `
       <div class="dialog-option" data-action="back">Back</div>
       <div class="dialog-option" data-action="close">Got it!</div>
@@ -1802,6 +1947,7 @@ function updateDialogContent(worker, page) {
     // Self-introduction
     roleEl.textContent = 'Self Introduction';
     textEl.textContent = wType.personality;
+    spokenText = wType.personality;
     optionsEl.innerHTML = `
       <div class="dialog-option" data-action="back">Back</div>
       <div class="dialog-option" data-action="close">Nice to meet you!</div>
@@ -1810,6 +1956,7 @@ function updateDialogContent(worker, page) {
     // Skills
     roleEl.textContent = 'Skills & Abilities';
     textEl.textContent = 'These are my specialties:';
+    spokenText = '私のスキルは、' + wType.skills.join('、') + 'です。';
     wType.skills.forEach(skill => {
       skillsEl.innerHTML += `<span class="skill-tag" style="border: 1px solid ${new THREE.Color(wType.color).getStyle()}30; color: ${new THREE.Color(wType.color).getStyle()}">${skill}</span>`;
     });
@@ -1818,6 +1965,9 @@ function updateDialogContent(worker, page) {
       <div class="dialog-option" data-action="close">Impressive!</div>
     `;
   }
+
+  // TTS — worker speaks the text aloud
+  if (spokenText) ozSpeak(spokenText);
 
   // Attach click handlers
   optionsEl.querySelectorAll('.dialog-option').forEach(opt => {
@@ -1919,8 +2069,8 @@ let fpsCounter = 0;
 let fpsLastCheck = performance.now();
 let ws = null;
 let screenGlowIntensity = 0;
-let wsReconnectDelay = 500;
-const WS_MAX_RECONNECT_DELAY = 8000;
+let wsReconnectDelay = 2000;
+const WS_MAX_RECONNECT_DELAY = 30000;
 let wsReconnectTimer = null;
 let wsConnectAttempts = 0;
 
@@ -1936,6 +2086,12 @@ function connectWS() {
   }
 
   wsConnectAttempts++;
+
+  // Stop trying after 3 failures — screencast server is not running
+  if (wsConnectAttempts > 3) {
+    console.log('Screencast server (ws://localhost:8766) not available — stopped retrying');
+    return;
+  }
 
   try {
     ws = new WebSocket('ws://localhost:8766');
@@ -2079,8 +2235,7 @@ setInterval(() => {
       // Send failed — connection is likely dead
       try { ws.close(); } catch(ex) {}
     }
-  } else if (!wsConnected && !wsReconnectTimer) {
-    // Safety net: if somehow we're disconnected with no reconnect scheduled
+  } else if (!wsConnected && !wsReconnectTimer && wsConnectAttempts <= 3) {
     connectWS();
   }
 }, 5000);
@@ -2202,6 +2357,8 @@ function switchToOrbital() {
 // ============================
 const keys = {};
 window.addEventListener('keydown', (e) => {
+  // Skip game keys when voice panel is open (except T and Escape)
+  if (voiceController && voiceController.panelOpen && e.key !== 'Escape' && e.key !== 't' && e.key !== 'T') return;
   keys[e.key.toLowerCase()] = true;
 
   if (e.key === ' ') {
@@ -2231,9 +2388,39 @@ window.addEventListener('keydown', (e) => {
     }
   }
 
-  // Escape exits first-person mode
-  if (e.key === 'Escape' && cameraMode === 'firstPerson') {
-    switchToOrbital();
+  // Escape exits first-person mode or closes text input
+  if (e.key === 'Escape') {
+    if (voiceController && voiceController.textInputVisible) {
+      voiceController.hideTextInput();
+    } else if (cameraMode === 'firstPerson') {
+      switchToOrbital();
+    }
+  }
+
+  // T key — voice command (record toggle)
+  if ((e.key === 't' || e.key === 'T') && !e.repeat) {
+    if (!voiceController) return;
+    e.preventDefault();
+    if (voiceController.recording) {
+      voiceController.stopRecording();
+    } else if (voiceController.panelOpen && !voiceController.recording) {
+      // Panel open but not recording — close or start recording
+      voiceController.startRecording();
+    } else {
+      // Direct: open panel + start recording immediately
+      voiceController.openPanel();
+      voiceController.startRecording();
+    }
+    return;
+  }
+  // / key — text input mode (alternative)
+  if (e.key === '/' && !e.repeat) {
+    if (!voiceController) return;
+    if (!voiceController.panelOpen) {
+      e.preventDefault();
+      voiceController.openPanel();
+      return;
+    }
   }
 });
 window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
@@ -2566,6 +2753,9 @@ function animate() {
   }
   particles.geometry.attributes.position.needsUpdate = true;
 
+  // --- Voice navigator camera tween ---
+  voiceNavigator.update();
+
   controls.update();
   renderer.render(scene, camera);
 }
@@ -2576,6 +2766,510 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+// ============================
+// Voice Controller
+// ============================
+class VoiceController {
+  constructor() {
+    this.panelEl = document.getElementById('voicePanel');
+    this.statusEl = document.getElementById('voiceStatus');
+    this.textInputField = document.getElementById('voiceInput');
+    this.micEl = document.getElementById('voiceMic');
+    this.micLabelEl = document.getElementById('voiceMicLabel');
+    this.transcriptEl = document.getElementById('voiceTranscript');
+    this.transcriptTextEl = document.getElementById('transcriptText');
+    this.hideTimer = null;
+    this.onCommand = null;
+
+    // Recording state
+    this.panelOpen = false;
+    this.recording = false;
+    this.processing = false;
+    this.mediaRecorder = null;
+    this.audioChunks = [];
+    this.stream = null;
+
+    // Aliases
+    this.textInputVisible = false;
+
+    this._initTextInput();
+    this._initMicButton();
+  }
+
+  _initTextInput() {
+    this.textInputField.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') {
+        const text = this.textInputField.value.trim();
+        if (text) {
+          this.showTranscript(text, true);
+          if (this.onCommand) this.onCommand(text);
+          this.textInputField.value = '';
+        }
+        this.closePanel();
+      }
+      if (e.key === 'Escape') {
+        this.closePanel();
+      }
+    });
+    this.textInputField.addEventListener('keyup', (e) => e.stopPropagation());
+  }
+
+  _initMicButton() {
+    this.micEl.addEventListener('click', () => this.toggle());
+  }
+
+  toggle() {
+    if (this.recording) {
+      this.stopRecording();
+    } else if (this.panelOpen) {
+      this.closePanel();
+    } else {
+      this.openPanel();
+    }
+  }
+
+  openPanel() {
+    this.panelOpen = true;
+    this.textInputVisible = true;
+    this.panelEl.classList.add('show');
+    this.panelEl.classList.remove('recording', 'processing');
+    this.statusEl.textContent = '🎤 Tで録音 / テキスト入力してEnter';
+    this.textInputField.focus();
+    this.micLabelEl.textContent = 'OPEN';
+    this.micEl.classList.add('listening');
+  }
+
+  closePanel() {
+    if (this.recording) this.stopRecording();
+    this.panelOpen = false;
+    this.textInputVisible = false;
+    this.panelEl.classList.remove('show', 'recording', 'processing');
+    this.textInputField.blur();
+    this.textInputField.value = '';
+    this.micLabelEl.textContent = 'OFF';
+    this.micEl.classList.remove('listening', 'always-on');
+  }
+
+  async startRecording() {
+    if (this.recording || this.processing) return;
+
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch(e) {
+      showNotification('Microphone access denied');
+      return;
+    }
+
+    this.audioChunks = [];
+    this.mediaRecorder = new MediaRecorder(this.stream, { mimeType: 'audio/webm' });
+
+    this.mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) this.audioChunks.push(e.data);
+    };
+
+    this.mediaRecorder.onstop = () => {
+      // Stop mic
+      this.stream.getTracks().forEach(t => t.stop());
+      this.stream = null;
+      // Process
+      this._transcribe();
+    };
+
+    this.mediaRecorder.start();
+    this.recording = true;
+    this.panelEl.classList.add('recording');
+    this.panelEl.classList.remove('processing');
+    this.statusEl.textContent = '🔴 録音中... もう一度Tで停止';
+    this.micLabelEl.textContent = 'REC';
+    this.micEl.classList.add('always-on');
+  }
+
+  stopRecording() {
+    if (!this.recording || !this.mediaRecorder) return;
+    this.recording = false;
+    try { this.mediaRecorder.stop(); } catch(e) {}
+  }
+
+  async _transcribe() {
+    if (this.audioChunks.length === 0) {
+      this.statusEl.textContent = '音声が検出されませんでした';
+      setTimeout(() => this.closePanel(), 2000);
+      return;
+    }
+
+    this.processing = true;
+    this.panelEl.classList.remove('recording');
+    this.panelEl.classList.add('processing');
+    this.statusEl.textContent = '⏳ 認識中...';
+    this.micLabelEl.textContent = '...';
+
+    const blob = new Blob(this.audioChunks, { type: 'audio/webm' });
+
+    try {
+      const resp = await fetch('/api/transcribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'audio/webm' },
+        body: blob,
+      });
+      const data = await resp.json();
+
+      if (data.ok && data.text) {
+        this.statusEl.textContent = `✅ "${data.text}"`;
+        this.showTranscript(data.text, true);
+        if (this.onCommand) this.onCommand(data.text);
+        setTimeout(() => this.closePanel(), 2000);
+      } else {
+        this.statusEl.textContent = '認識できませんでした — テキストで入力してください';
+        this.textInputField.focus();
+      }
+    } catch(e) {
+      console.error('Transcribe error:', e);
+      this.statusEl.textContent = 'サーバーエラー — テキストで入力してください';
+      this.textInputField.focus();
+    }
+
+    this.processing = false;
+    this.panelEl.classList.remove('processing');
+  }
+
+  showTranscript(text, isFinal) {
+    this.transcriptTextEl.textContent = text;
+    this.transcriptEl.classList.add('show');
+    if (this.hideTimer) clearTimeout(this.hideTimer);
+    if (isFinal) {
+      this.hideTimer = setTimeout(() => this.transcriptEl.classList.remove('show'), 3000);
+    }
+  }
+}
+
+
+// ============================
+// Voice Command Parser
+// ============================
+class VoiceCommandParser {
+  constructor() {
+    // Navigation patterns (Japanese + English)
+    this.navPatterns = [
+      // Japanese
+      { re: /(.+?)(?:のところ|の所)に(?:行って|行きたい|飛んで|移動)/, group: 1 },
+      { re: /(.+?)(?:に行って|に行きたい|へ行って|に飛んで|に移動)/, group: 1 },
+      { re: /(.+?)(?:を見せて|を見たい|を表示|見せて)/, group: 1 },
+      { re: /(.+?)(?:に行く|へ行く)/, group: 1 },
+      // English
+      { re: /(?:go to|fly to|take me to|move to|head to)\s+(.+)/i, group: 1 },
+      { re: /(?:show me|show|look at|find)\s+(.+)/i, group: 1 },
+    ];
+
+    // Talk patterns
+    this.talkPatterns = [
+      { re: /(.+?)と(?:話して|話したい|会話|チャット)/, group: 1 },
+      { re: /(?:talk to|speak to|chat with)\s+(.+)/i, group: 1 },
+      { re: /(.+?)(?:に聞いて|に質問)/, group: 1 },
+    ];
+
+    // Action patterns
+    this.actionPatterns = [
+      { re: /(.+?)にタスク(?:を振って|振って|を割り当て)/, group: 1 },
+      { re: /(?:assign|give) (?:a )?task to\s+(.+)/i, group: 1 },
+      { re: /(.+?)を休ませて/, group: 1 },
+      { re: /(?:release|free)\s+(.+)/i, group: 1 },
+    ];
+
+    // Camera patterns
+    this.cameraPatterns = [
+      { re: /一人称|ファーストパーソン|first\s*person/i, action: 'firstPerson' },
+      { re: /三人称|サード|orbital|オービタル|俯瞰/i, action: 'orbital' },
+      { re: /ズームイン|近づ|zoom\s*in/i, action: 'zoomIn' },
+      { re: /ズームアウト|離れ|遠く|zoom\s*out/i, action: 'zoomOut' },
+    ];
+
+    // Dialog patterns (for in-dialog voice)
+    this.dialogPatterns = [
+      { re: /スキル|能力|skills/i, action: 'skills' },
+      { re: /タスク|仕事|作業|what.*working|task/i, action: 'task' },
+      { re: /自己紹介|紹介|about|intro/i, action: 'intro' },
+      { re: /(?:じゃあね|バイバイ|さよなら|閉じて|see you|bye|close|goodbye)/i, action: 'close' },
+      { re: /戻(?:って|る)|back/i, action: 'back' },
+    ];
+  }
+
+  parse(text) {
+    text = text.trim();
+
+    // 1. Camera commands
+    for (const p of this.cameraPatterns) {
+      if (p.re.test(text)) return { intent: 'camera', action: p.action };
+    }
+
+    // 2. Dialog commands (when in dialog)
+    if (dialogActive) {
+      for (const p of this.dialogPatterns) {
+        if (p.re.test(text)) return { intent: 'dialog', action: p.action };
+      }
+    }
+
+    // 3. Talk commands
+    for (const p of this.talkPatterns) {
+      const m = text.match(p.re);
+      if (m) return { intent: 'talk', target: m[p.group].trim() };
+    }
+
+    // 4. Action commands
+    for (const p of this.actionPatterns) {
+      const m = text.match(p.re);
+      if (m) {
+        const target = m[p.group].trim();
+        if (/休|release|free/i.test(text)) return { intent: 'release', target };
+        return { intent: 'assign', target };
+      }
+    }
+
+    // 5. Navigation commands
+    for (const p of this.navPatterns) {
+      const m = text.match(p.re);
+      if (m) return { intent: 'navigate', target: m[p.group].trim() };
+    }
+
+    // 6. Fallback: treat entire text as navigation target
+    if (text.length > 0 && text.length < 30) {
+      return { intent: 'navigate', target: text };
+    }
+
+    return { intent: 'unknown', text };
+  }
+}
+
+
+// ============================
+// Voice Navigator
+// ============================
+const voiceNavigator = {
+  // Camera tween state
+  tweening: false,
+  tweenStart: null,
+  tweenDuration: 1.5,
+  fromCamPos: null,
+  toCamPos: null,
+  fromTarget: null,
+  toTarget: null,
+  onArrival: null, // callback after tween completes
+
+  // Name → position resolver with fuzzy matching
+  nameAliases: {
+    // Workers (Japanese + English + abbreviations)
+    'スケジューラー': 'scheduler', 'スケジューラ': 'scheduler', 'scheduler': 'scheduler',
+    'リサーチャー': 'researcher', 'リサーチャ': 'researcher', 'researcher': 'researcher', '研究': 'researcher',
+    'コーダー': 'coder', 'コーダ': 'coder', 'coder': 'coder', 'プログラマー': 'coder', 'エンジニア': 'coder',
+    'レビューアー': 'reviewer', 'レビューア': 'reviewer', 'レビュワー': 'reviewer', 'reviewer': 'reviewer',
+    'デバッガー': 'debugger', 'デバッガ': 'debugger', 'debugger': 'debugger', 'バグ': 'debugger',
+    'ライター': 'writer', 'writer': 'writer', 'ドキュメント': 'writer',
+
+    // Landmarks
+    'モニター': 'monitor', 'monitor': 'monitor', 'スクリーン': 'monitor', 'screen': 'monitor', '画面': 'monitor',
+    'ヒトミ': 'hitomi', 'hitomi': 'hitomi', 'タワー': 'hitomi', 'tower': 'hitomi', '中央': 'hitomi',
+    '掲示板': 'board', 'ボード': 'board', 'board': 'board', 'bulletin': 'board', 'タスクボード': 'board',
+    'ラウンジ': 'lounge', 'ソファ': 'lounge', 'lounge': 'lounge', 'sofa': 'lounge', '休憩': 'lounge',
+    'ホーム': 'home', 'home': 'home', 'スタート': 'home', 'start': 'home',
+
+    // Islands by color / number
+    'ピンク': 'island_0', 'pink': 'island_0', '通信': 'island_0', 'communication': 'island_0',
+    'シアン': 'island_1', 'cyan': 'island_1', '開発': 'island_1', 'development': 'island_1', 'dev': 'island_1',
+    '黄色': 'island_2', 'yellow': 'island_2', '金融': 'island_2', 'finance': 'island_2',
+    '緑': 'island_3', 'green': 'island_3', 'エンタメ': 'island_3', 'entertainment': 'island_3',
+    '紫': 'island_4', 'purple': 'island_4', '分析': 'island_4', 'analytics': 'island_4',
+    'オレンジ': 'island_5', 'orange': 'island_5', '運用': 'island_5', 'operations': 'island_5',
+  },
+
+  resolveTarget(name) {
+    const lower = name.toLowerCase();
+
+    // 1. Direct alias match
+    for (const [alias, key] of Object.entries(this.nameAliases)) {
+      if (lower.includes(alias.toLowerCase())) {
+        return this.getPosition(key);
+      }
+    }
+
+    // 2. Fuzzy: check if name partially matches any worker type label
+    for (const w of workers) {
+      const wType = WORKER_TYPES[w.type];
+      if (lower.includes(w.type) || lower.includes(wType.label.toLowerCase())) {
+        return { pos: w.group.position.clone(), key: w.type, worker: w };
+      }
+    }
+
+    return null;
+  },
+
+  getPosition(key) {
+    // Worker
+    const worker = workers.find(w => w.type === key);
+    if (worker) {
+      return { pos: worker.group.position.clone(), key, worker };
+    }
+
+    // Landmarks
+    const landmarks = {
+      'monitor': new THREE.Vector3(0, 12, -8),
+      'hitomi': new THREE.Vector3(0, 8, -2),
+      'board': new THREE.Vector3(-10, 4, 5),
+      'lounge': new THREE.Vector3(9, 1.2, 6),
+      'home': new THREE.Vector3(0, 1.2, 14),
+    };
+    if (landmarks[key]) return { pos: landmarks[key].clone(), key };
+
+    // Islands
+    const islandMatch = key.match(/^island_(\d+)$/);
+    if (islandMatch) {
+      const idx = parseInt(islandMatch[1]);
+      if (subIslands[idx]) return { pos: subIslands[idx].position.clone(), key };
+    }
+
+    return null;
+  },
+
+  flyTo(targetPos, onArrival) {
+    if (cameraMode === 'firstPerson') switchToOrbital();
+
+    this.tweening = true;
+    this.tweenStart = performance.now();
+    this.fromCamPos = camera.position.clone();
+    this.fromTarget = controls.target.clone();
+
+    // Calculate camera position: offset from target
+    const offset = new THREE.Vector3(5, 5, 8);
+    this.toCamPos = targetPos.clone().add(offset);
+    this.toTarget = targetPos.clone();
+    this.toTarget.y += 2; // Look slightly above ground level
+    this.onArrival = onArrival || null;
+  },
+
+  // Called in animate() loop
+  update() {
+    if (!this.tweening) return;
+
+    const elapsed = (performance.now() - this.tweenStart) / 1000;
+    let t = Math.min(elapsed / this.tweenDuration, 1);
+
+    // Ease out cubic
+    t = 1 - Math.pow(1 - t, 3);
+
+    camera.position.lerpVectors(this.fromCamPos, this.toCamPos, t);
+    controls.target.lerpVectors(this.fromTarget, this.toTarget, t);
+
+    if (t >= 1) {
+      this.tweening = false;
+      if (this.onArrival) {
+        this.onArrival();
+        this.onArrival = null;
+      }
+    }
+  },
+};
+
+
+// ============================
+// Voice System Integration
+// ============================
+const voiceController = new VoiceController();
+const voiceParser = new VoiceCommandParser();
+
+voiceController.onCommand = (text) => {
+  const cmd = voiceParser.parse(text);
+
+  switch (cmd.intent) {
+    case 'navigate': {
+      const resolved = voiceNavigator.resolveTarget(cmd.target);
+      if (resolved) {
+        ozSpeak(`${cmd.target}に移動します`);
+        showNotification(`Flying to ${cmd.target}`);
+        voiceNavigator.flyTo(resolved.pos);
+      } else {
+        ozSpeak(`${cmd.target}が見つかりません`);
+        showNotification(`"${cmd.target}" — location not found`);
+      }
+      break;
+    }
+
+    case 'talk': {
+      const resolved = voiceNavigator.resolveTarget(cmd.target);
+      if (resolved && resolved.worker) {
+        const label = WORKER_TYPES[resolved.worker.type].label;
+        ozSpeak(`${label}のところに行きます`);
+        showNotification(`Going to talk to ${label}`);
+        voiceNavigator.flyTo(resolved.pos, () => {
+          showDialog(resolved.worker);
+        });
+      } else {
+        ozSpeak(`${cmd.target}が見つかりません`);
+        showNotification(`Worker "${cmd.target}" not found`);
+      }
+      break;
+    }
+
+    case 'assign': {
+      const resolved = voiceNavigator.resolveTarget(cmd.target);
+      if (resolved && resolved.worker) {
+        assignWork(resolved.worker);
+        const label = WORKER_TYPES[resolved.worker.type].label;
+        ozSpeak(`${label}にタスクを割り当てました`);
+        showNotification(`Task assigned to ${label}`);
+      }
+      break;
+    }
+
+    case 'release': {
+      const resolved = voiceNavigator.resolveTarget(cmd.target);
+      if (resolved && resolved.worker) {
+        releaseWorker(resolved.worker);
+        const label = WORKER_TYPES[resolved.worker.type].label;
+        ozSpeak(`${label}を休憩に送りました`);
+        showNotification(`${label} released`);
+      }
+      break;
+    }
+
+    case 'camera': {
+      if (cmd.action === 'firstPerson') switchToFirstPerson();
+      else if (cmd.action === 'orbital') switchToOrbital();
+      else if (cmd.action === 'zoomIn') {
+        camera.position.lerp(controls.target, 0.3);
+      }
+      else if (cmd.action === 'zoomOut') {
+        const dir = camera.position.clone().sub(controls.target).normalize();
+        camera.position.add(dir.multiplyScalar(10));
+      }
+      break;
+    }
+
+    case 'dialog': {
+      if (!dialogActive || !dialogWorker) break;
+      if (cmd.action === 'close') hideDialog();
+      else if (cmd.action === 'back') { dialogPage = 0; updateDialogContent(dialogWorker, 0); }
+      else if (cmd.action === 'task') { dialogPage = 1; updateDialogContent(dialogWorker, 1); }
+      else if (cmd.action === 'intro') { dialogPage = 2; updateDialogContent(dialogWorker, 2); }
+      else if (cmd.action === 'skills') { dialogPage = 3; updateDialogContent(dialogWorker, 3); }
+      break;
+    }
+
+    default:
+      showNotification(`Voice: "${text}"`);
+  }
+};
+
+// ============================
+// TTS — Workers speak back
+// ============================
+function ozSpeak(text, voice = 'Kyoko', rate = 200) {
+  fetch('/api/speak', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, voice, rate }),
+  }).catch(() => {});
+}
+
 
 // --- Start ---
 setTimeout(() => {
