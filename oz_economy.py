@@ -29,6 +29,16 @@ from typing import Optional
 DB_PATH = os.path.expanduser("~/.openclaw/workspace/oz_economy.db")
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
+
+def _secure_db_perms():
+    """Ensure the ledger DB is readable/writable only by the owner."""
+    for path in (DB_PATH, DB_PATH + "-wal", DB_PATH + "-shm"):
+        if os.path.exists(path):
+            try:
+                os.chmod(path, 0o600)
+            except OSError:
+                pass
+
 # 1 OZC ≈ ¥1 (the exchange rate to real currency)
 OZC_TO_JPY = 1.0
 
@@ -145,6 +155,7 @@ def init_db():
                     (agent, balance),
                 )
         conn.close()
+        _secure_db_perms()
 
 
 # ================================
@@ -291,11 +302,15 @@ def transfer(
                     "INSERT INTO balances (agent, balance) VALUES (?, ?)", (a, 0)
                 )
 
-        # Check daily cap (exempt internal moves and topups)
+        # Check daily AND monthly caps (both exempt internal moves and topups)
         if action not in DAILY_CAP_EXEMPT_ACTIONS:
             today_start = _today_start_ts()
+            month_start = _month_start_ts()
+            exempt_clause = (
+                "action NOT IN ('topup','auto.topup','auction.win','task.assign','task.report')"
+            )
             cur.execute(
-                "SELECT COALESCE(SUM(amount), 0) FROM ledger WHERE ts >= ? AND action NOT IN ('topup','auto.topup','auction.win','task.assign','task.report')",
+                f"SELECT COALESCE(SUM(amount), 0) FROM ledger WHERE ts >= ? AND {exempt_clause}",
                 (today_start,),
             )
             spent_today = float(cur.fetchone()[0])
@@ -303,6 +318,37 @@ def transfer(
                 conn.close()
                 raise ValueError(
                     f"daily budget cap exceeded: spent={spent_today} + {amount} > {DAILY_BUDGET_CAP}"
+                )
+
+            cur.execute(
+                f"SELECT COALESCE(SUM(amount), 0) FROM ledger WHERE ts >= ? AND {exempt_clause}",
+                (month_start,),
+            )
+            spent_month = float(cur.fetchone()[0])
+            if ozc_to_jpy(spent_month + amount) > MONTHLY_REAL_CAP_JPY:
+                conn.close()
+                raise ValueError(
+                    f"monthly real-money cap exceeded: ¥{ozc_to_jpy(spent_month + amount):.0f} > ¥{MONTHLY_REAL_CAP_JPY}"
+                )
+
+        # Verify the most recent block hasn't been tampered with before
+        # appending. If the chain is broken, refuse to write — this stops
+        # an attacker who edited the DB from extending it cleanly.
+        cur.execute(
+            "SELECT id, ts, from_agent, to_agent, amount, action, detail, prev_hash, hash "
+            "FROM ledger ORDER BY id DESC LIMIT 1"
+        )
+        last = cur.fetchone()
+        if last is not None:
+            last_tx = {
+                "id": last[0], "ts": last[1], "from_agent": last[2],
+                "to_agent": last[3], "amount": last[4], "action": last[5],
+                "detail": last[6], "prev_hash": last[7],
+            }
+            if _compute_block_hash(last_tx) != last[8]:
+                conn.close()
+                raise ValueError(
+                    f"ledger integrity check failed at block #{last[0]} — refusing to write"
                 )
 
         # Check from balance

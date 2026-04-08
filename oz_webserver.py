@@ -2,6 +2,12 @@
 oz_webserver.py - OZ World HTMLビューアー用HTTPサーバー
 - oz_world.html を http://localhost:8767/oz_world.html で配信
 - /api/transcribe: Whisperローカル音声認識
+
+セキュリティ:
+- 127.0.0.1 のみにバインド (LAN/WiFiから到達不可)
+- 全 mutating エンドポイントは X-OZ-Token ヘッダー必須
+- トークンは ~/.openclaw/oz_token に 0600 で保存
+- HTML 配信時に <meta name="oz-token"> として埋め込みフロントが自動付与
 """
 
 import http.server
@@ -10,6 +16,7 @@ import os
 import sys
 import signal
 import json
+import secrets
 import tempfile
 import threading
 import subprocess
@@ -23,6 +30,42 @@ PORT = 8767
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 TASK_STATUS_FILE = os.path.join(DIRECTORY, "openclaw_task_status.json")
 WORKER_STATE_FILE = os.path.join(DIRECTORY, "oz_worker_state.json")
+
+# === Security: per-user shared secret ===
+TOKEN_PATH = os.path.expanduser("~/.openclaw/oz_token")
+os.makedirs(os.path.dirname(TOKEN_PATH), exist_ok=True)
+
+def _load_or_create_token() -> str:
+    if os.path.exists(TOKEN_PATH):
+        try:
+            with open(TOKEN_PATH) as f:
+                t = f.read().strip()
+            if t:
+                return t
+        except OSError:
+            pass
+    t = secrets.token_urlsafe(32)
+    fd = os.open(TOKEN_PATH, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(t)
+    return t
+
+OZ_TOKEN = _load_or_create_token()
+
+# Limits to prevent runaway resource consumption
+MAX_AUDIO_BYTES = 20 * 1024 * 1024   # 20 MB
+MAX_USER_MESSAGE = 800                # characters
+MAX_BODY_BYTES = 2 * 1024 * 1024     # 2 MB for any JSON body
+
+# Allowed values for the say(1) shell-out
+ALLOWED_VOICES = {
+    "Kyoko", "Otoya", "Samantha", "Alex", "Daniel",
+    "Karen", "Moira", "Tessa", "Victoria", "Fred", "Ralph",
+}
+RATE_MIN, RATE_MAX = 50, 500
+
+# Allow turning the destructive reset endpoint on only when explicitly requested
+ALLOW_RESET = os.environ.get("OZ_ALLOW_RESET") == "1"
 
 # Initialize the OZ economy database on startup
 oz_economy.init_db()
@@ -50,11 +93,37 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
         super().__init__(*args, directory=DIRECTORY, **kwargs)
 
     def end_headers(self):
-        # CORS for all responses (so browser can fetch local assets cross-origin)
-        self.send_header("Access-Control-Allow-Origin", "*")
+        # CORS only for our own loopback origins. We never need to be reached
+        # from other devices, so don't advertise wildcard.
+        self.send_header("Access-Control-Allow-Origin", "http://127.0.0.1:%d" % PORT)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Range")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Range, X-OZ-Token")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
         super().end_headers()
+
+    # === Security helpers ===
+    def _check_token(self) -> bool:
+        # Constant-time compare so brute force can't time-side-channel
+        sent = self.headers.get("X-OZ-Token", "")
+        return secrets.compare_digest(sent, OZ_TOKEN)
+
+    def _read_body(self) -> bytes:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            return b""
+        if length < 0 or length > MAX_BODY_BYTES:
+            self._send_json({"ok": False, "error": "body too large"}, status=413)
+            return None
+        return self.rfile.read(length) if length else b""
+
+    def _require_auth(self) -> bool:
+        if self._check_token():
+            return True
+        self._send_json({"ok": False, "error": "unauthorized"}, status=401)
+        return False
 
     def log_message(self, format, *args):
         # APIリクエストとGETリクエストのみログ表示
@@ -115,6 +184,33 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(oz_economy.verify_chain())
             return
 
+        # Inject the OZ token into the HTML at request time so that:
+        # 1) the token never sits in a static file on disk
+        # 2) only loopback requests get it (we already bind to 127.0.0.1)
+        if self.path == "/oz_world.html" or self.path == "/" or self.path == "":
+            html_path = os.path.join(DIRECTORY, "oz_world.html")
+            try:
+                with open(html_path, "rb") as f:
+                    html = f.read()
+            except OSError:
+                self.send_error(404)
+                return
+            meta = (
+                '<meta name="oz-token" content="' + OZ_TOKEN + '">'
+            ).encode("utf-8")
+            # Inject right after <head> if present, otherwise at the start
+            if b"<head>" in html:
+                html = html.replace(b"<head>", b"<head>\n" + meta, 1)
+            else:
+                html = meta + html
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(html)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(html)
+            return
+
         if self.path == "/api/external/providers":
             providers = []
             for name, info in oz_external.EXTERNAL_PROVIDERS.items():
@@ -134,9 +230,14 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_POST(self):
+        # All POST endpoints require auth.
+        if not self._require_auth():
+            return
+
         if self.path == "/api/workers":
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
+            body = self._read_body()
+            if body is None:
+                return
             try:
                 data = json.loads(body)
                 with open(WORKER_STATE_FILE, "w") as f:
@@ -147,89 +248,127 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         if self.path == "/api/speak":
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
+            body = self._read_body()
+            if body is None:
+                return
             try:
                 data = json.loads(body)
-                text = data.get("text", "")
-                voice = data.get("voice", "Kyoko")  # Kyoko=日本語, Samantha=英語
-                rate = data.get("rate", 200)
-                agent = data.get("agent", "hitomi")  # who is speaking
+                text = (data.get("text") or "")[:500]  # cap length
+                voice = data.get("voice") or "Kyoko"
+                if voice not in ALLOWED_VOICES:
+                    voice = "Kyoko"
+                try:
+                    rate = int(data.get("rate", 200))
+                except (TypeError, ValueError):
+                    rate = 200
+                rate = max(RATE_MIN, min(RATE_MAX, rate))
+                agent = data.get("agent", "hitomi")
                 if text:
-                    # Non-blocking TTS via macOS say
                     subprocess.Popen(
-                        ["say", "-v", voice, "-r", str(rate), text],
+                        ["say", "-v", voice, "-r", str(rate), "--", text],
                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                     )
-                    # Charge the speaking agent for TTS usage
                     try:
                         oz_economy.charge_action(agent, "tts.speak", text[:60])
                     except Exception:
                         pass
                 self._send_json({"ok": True})
             except Exception as e:
-                self._send_json({"ok": False, "error": str(e)}, status=500)
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
+                print(f"  /api/speak error: {e}")
             return
 
         # === OZ Economy POST endpoints ===
         if self.path == "/api/economy/transfer":
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
+            body = self._read_body()
+            if body is None:
+                return
             try:
                 data = json.loads(body)
+                # Hard cap a single transfer to avoid runaway abuse
+                amount = float(data["amount"])
+                if amount < 0 or amount > 100000:
+                    self._send_json({"ok": False, "error": "amount out of range"}, status=400)
+                    return
+                # Sanitize action and detail (no control chars, length cap)
+                action = str(data.get("action", "manual"))[:64]
+                detail = str(data.get("detail", ""))[:200]
                 tx = oz_economy.transfer(
-                    data["from_agent"],
-                    data["to_agent"],
-                    float(data["amount"]),
-                    data.get("action", "manual"),
-                    data.get("detail", ""),
+                    str(data["from_agent"])[:64],
+                    str(data["to_agent"])[:64],
+                    amount,
+                    action,
+                    detail,
                 )
                 self._send_json({"ok": True, "tx": tx})
-            except Exception as e:
+            except ValueError as e:
                 self._send_json({"ok": False, "error": str(e)}, status=400)
+            except Exception as e:
+                print(f"  /api/economy/transfer error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
             return
 
         if self.path == "/api/economy/charge":
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
+            body = self._read_body()
+            if body is None:
+                return
             try:
                 data = json.loads(body)
                 tx = oz_economy.charge_action(
-                    data["agent"],
-                    data["action"],
-                    data.get("detail", ""),
+                    str(data["agent"])[:64],
+                    str(data["action"])[:64],
+                    str(data.get("detail", ""))[:200],
                 )
                 self._send_json({"ok": True, "tx": tx})
-            except Exception as e:
+            except ValueError as e:
                 self._send_json({"ok": False, "error": str(e)}, status=400)
+            except Exception as e:
+                print(f"  /api/economy/charge error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
             return
 
         if self.path == "/api/economy/reset":
+            # Reset is dangerous: it wipes balances back to defaults.
+            # Disabled by default; set OZ_ALLOW_RESET=1 to enable.
+            if not ALLOW_RESET:
+                self._send_json({"ok": False, "error": "reset disabled"}, status=403)
+                return
             try:
                 oz_economy.reset_daily_balances()
                 self._send_json({"ok": True})
             except Exception as e:
-                self._send_json({"ok": False, "error": str(e)}, status=500)
+                print(f"  /api/economy/reset error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
             return
 
         if self.path == "/api/economy/topup":
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
+            body = self._read_body()
+            if body is None:
+                return
             try:
                 data = json.loads(body)
-                agent = data.get("agent", "hitomi")
                 amount = float(data.get("amount", 0))
-                source = data.get("source", "manual")
-                tx = oz_economy.topup(agent, amount, source)
+                if amount <= 0 or amount > 100000:
+                    self._send_json({"ok": False, "error": "amount out of range"}, status=400)
+                    return
+                tx = oz_economy.topup(
+                    str(data.get("agent", "hitomi"))[:64],
+                    amount,
+                    str(data.get("source", "manual"))[:64],
+                )
                 self._send_json({"ok": True, "tx": tx})
-            except Exception as e:
+            except ValueError as e:
                 self._send_json({"ok": False, "error": str(e)}, status=400)
+            except Exception as e:
+                print(f"  /api/economy/topup error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
             return
 
         # OZ Store — buying OZC with real money (mock checkout)
         if self.path == "/api/store/purchase":
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
+            body = self._read_body()
+            if body is None:
+                return
             try:
                 data = json.loads(body)
                 package = data.get("package")
@@ -272,14 +411,18 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         if self.path == "/api/external/call":
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
+            body = self._read_body()
+            if body is None:
+                return
             try:
                 data = json.loads(body)
                 provider = data.get("provider")
-                prompt = data.get("prompt", "")
+                prompt = (data.get("prompt") or "")[:MAX_USER_MESSAGE]
                 if not provider or not prompt:
                     self._send_json({"ok": False, "error": "provider and prompt required"}, status=400)
+                    return
+                if provider not in oz_external.EXTERNAL_PROVIDERS:
+                    self._send_json({"ok": False, "error": "unknown provider"}, status=400)
                     return
                 result = oz_external.call_external(provider, prompt)
                 # Charge hitomi for the call (real cost in OZC)
@@ -299,78 +442,93 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
 
         # === Bidding — agents bid on tasks ===
         if self.path == "/api/bidding/bids":
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
+            body = self._read_body()
+            if body is None:
+                return
             try:
                 data = json.loads(body)
-                task = data.get("task", "")
+                task = (data.get("task") or "")[:MAX_USER_MESSAGE]
                 bids = oz_bidding.collect_bids(task)
                 self._send_json({"ok": True, "task": task, "bids": bids})
             except Exception as e:
-                self._send_json({"ok": False, "error": str(e)}, status=500)
+                print(f"  /api/bidding/bids error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
             return
 
         if self.path == "/api/bidding/auction":
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
+            body = self._read_body()
+            if body is None:
+                return
             try:
                 data = json.loads(body)
-                task = data.get("task", "")
+                task = (data.get("task") or "")[:MAX_USER_MESSAGE]
                 budget = data.get("max_budget")
+                if budget is not None:
+                    budget = float(budget)
                 result = oz_bidding.run_auction(task, max_budget=budget)
                 status = 200 if result.get("ok") else 400
                 self._send_json(result, status=status)
             except Exception as e:
-                self._send_json({"ok": False, "error": str(e)}, status=500)
+                print(f"  /api/bidding/auction error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
             return
 
         # === Agents — workers actually call Claude ===
         if self.path == "/api/agents/ask":
-            content_length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(content_length)
+            body = self._read_body()
+            if body is None:
+                return
             try:
                 data = json.loads(body)
-                agent = data.get("agent", "hitomi")
-                message = data.get("message", "")
+                agent = str(data.get("agent", "hitomi"))[:64]
+                message = (data.get("message") or "")[:MAX_USER_MESSAGE]
                 if not message:
                     self._send_json({"ok": False, "error": "message required"}, status=400)
                     return
-                # Run Claude call in a worker thread so the HTTP server stays responsive
+                if agent not in oz_agents.WORKER_PERSONALITIES:
+                    self._send_json({"ok": False, "error": "unknown agent"}, status=400)
+                    return
                 result = oz_agents.ask_agent(agent, message, timeout=45)
-                status = 200 if result.get("ok") else 402  # 402 Payment Required when broke
+                status = 200 if result.get("ok") else 402
                 self._send_json(result, status=status)
             except Exception as e:
-                self._send_json({"ok": False, "error": str(e)}, status=500)
+                print(f"  /api/agents/ask error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
             return
 
         if self.path == "/api/transcribe":
-            content_length = int(self.headers.get("Content-Length", 0))
-            audio_data = self.rfile.read(content_length)
             try:
-                # Save audio to temp file
+                length = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                self._send_json({"ok": False, "error": "invalid content-length"}, status=400)
+                return
+            if length <= 0 or length > MAX_AUDIO_BYTES:
+                self._send_json({"ok": False, "error": "audio too large"}, status=413)
+                return
+            audio_data = self.rfile.read(length)
+            tmp_path = None
+            try:
                 with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
                     tmp.write(audio_data)
                     tmp_path = tmp.name
-
-                # Transcribe with Whisper
                 model = get_whisper_model()
                 result = model.transcribe(tmp_path, language="ja", fp16=False)
                 text = result.get("text", "").strip()
-
-                # Cleanup
-                os.unlink(tmp_path)
-
-                # Charge "human" account for using STT (the user spoke)
                 try:
                     oz_economy.charge_action("human", "stt.transcribe", text[:60])
                 except Exception:
                     pass
-
                 print(f"  Transcribed: {text}")
                 self._send_json({"ok": True, "text": text})
             except Exception as e:
                 print(f"  Transcribe error: {e}")
-                self._send_json({"ok": False, "error": str(e)}, status=500)
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
+            finally:
+                if tmp_path:
+                    try:
+                        os.unlink(tmp_path)
+                    except OSError:
+                        pass
             return
 
         self.send_error(404)
@@ -399,8 +557,10 @@ def main():
     # SIGTERMでクリーンシャットダウン
     signal.signal(signal.SIGTERM, lambda s, f: sys.exit(0))
 
-    with ReusableTCPServer(("", port), OZHandler) as httpd:
-        print(f"HTTP server ready on port {port}")
+    # Bind ONLY to loopback. We never want to expose this to LAN/WiFi.
+    with ReusableTCPServer(("127.0.0.1", port), OZHandler) as httpd:
+        print(f"HTTP server ready on 127.0.0.1:{port}")
+        print(f"Auth token (do not share): ~/.openclaw/oz_token")
         sys.stdout.flush()
         try:
             httpd.serve_forever()

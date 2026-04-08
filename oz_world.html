@@ -2514,6 +2514,25 @@ function getAgentWorldPos(agentName) {
   return null;
 }
 
+// ============================
+// Auth — read token from <meta> and attach to every fetch
+// ============================
+const OZ_TOKEN = (() => {
+  const meta = document.querySelector('meta[name="oz-token"]');
+  return meta ? meta.getAttribute('content') : '';
+})();
+
+const _origFetch = window.fetch.bind(window);
+window.fetch = function(input, init = {}) {
+  // Only attach to same-origin /api/ requests so we never leak to third parties
+  let url;
+  try { url = (typeof input === 'string') ? input : input.url; } catch (e) { url = ''; }
+  if (url && (url.startsWith('/api/') || url.startsWith(location.origin + '/api/'))) {
+    init.headers = Object.assign({}, init.headers || {}, { 'X-OZ-Token': OZ_TOKEN });
+  }
+  return _origFetch(input, init);
+};
+
 // Polling: keep balances + ledger fresh from server
 const economyState = {
   balances: {},
@@ -2591,10 +2610,13 @@ function renderEconomyPanel() {
     const bal = economyState.balances[name];
     if (bal === undefined) return '';
     const wType = WORKER_TYPES[name];
-    const display = wType ? `${wType.emoji} ${wType.label}` : name;
+    // wType is from a static frontend constant — safe — but escape defensively
+    const display = wType
+      ? `${escapeHtml(wType.emoji)} ${escapeHtml(wType.label)}`
+      : escapeHtml(name);
     return `<div class="econ-balance-row">
       <span class="agent-name">${display}</span>
-      <span class="agent-coin">${Math.round(bal)}</span>
+      <span class="agent-coin">${Math.round(Number(bal) || 0)}</span>
     </div>`;
   }).join('');
 }
@@ -2607,14 +2629,19 @@ function renderTxList(txs) {
     return;
   }
   el.innerHTML = txs.map(tx => {
+    const fromShort = escapeHtml(shortName(tx.from_agent));
+    const toShort = escapeHtml(shortName(tx.to_agent));
+    const action = escapeHtml(String(tx.action || '')).slice(0, 32);
+    const detail = tx.detail ? ' · ' + escapeHtml(String(tx.detail)).slice(0, 30) : '';
+    const amount = Math.round(Number(tx.amount) || 0);
     return `<div class="econ-tx-row">
       <div class="econ-tx-flow">
-        <span>${shortName(tx.from_agent)}</span>
+        <span>${fromShort}</span>
         <span class="arrow">→</span>
-        <span>${shortName(tx.to_agent)}</span>
-        <span style="margin-left:auto;" class="econ-tx-amount">${Math.round(tx.amount)} OZC</span>
+        <span>${toShort}</span>
+        <span style="margin-left:auto;" class="econ-tx-amount">${amount} OZC</span>
       </div>
-      <div class="econ-tx-action">${tx.action}${tx.detail ? ' · ' + escapeHtml(tx.detail).slice(0, 30) : ''}</div>
+      <div class="econ-tx-action">${action}${detail}</div>
     </div>`;
   }).join('');
 }
@@ -2898,16 +2925,19 @@ function renderBids(bids) {
   const list = document.getElementById('auctionBidsList');
   list.innerHTML = bids.map((b, idx) => {
     const isExternal = b.is_external;
-    const emoji = isExternal ? b.emoji : (WORKER_TYPES[b.worker]?.emoji || '?');
-    const label = isExternal ? b.label : (WORKER_TYPES[b.worker]?.label || b.worker);
+    const rawEmoji = isExternal ? b.emoji : (WORKER_TYPES[b.worker]?.emoji || '?');
+    const rawLabel = isExternal ? b.label : (WORKER_TYPES[b.worker]?.label || b.worker);
+    const emoji = escapeHtml(String(rawEmoji));
+    const label = escapeHtml(String(rawLabel));
     const isWinner = idx === 0;
+    const cost = Number(b.real_cost_jpy);
     const externalBadge = isExternal ?
-      `<span style="font-size:9px; padding:2px 6px; background:rgba(139,92,246,0.15); color:#6d28d9; border-radius:6px; margin-left:6px;">EXT ¥${b.real_cost_jpy}</span>` : '';
+      `<span style="font-size:9px; padding:2px 6px; background:rgba(139,92,246,0.15); color:#6d28d9; border-radius:6px; margin-left:6px;">EXT ¥${Number.isFinite(cost) ? cost : 0}</span>` : '';
     return `<div class="bid-row ${isWinner ? 'winner' : ''}">
       <div class="bid-rank">#${idx + 1}</div>
       <div class="bid-emoji">${emoji}</div>
       <div class="bid-name">${label}${externalBadge}</div>
-      <div class="bid-amount">${Math.round(b.bid)} OZC</div>
+      <div class="bid-amount">${Math.round(Number(b.bid) || 0)} OZC</div>
     </div>`;
   }).join('');
 }
@@ -3275,8 +3305,9 @@ function askWorkerLive(worker, message, inputEl) {
   const wType = WORKER_TYPES[worker.type];
   const originalText = textEl.textContent;
 
-  // Show "thinking" state
-  textEl.innerHTML = `<span style="opacity:0.5;">${wType.label}が考えています…</span>`;
+  // Show "thinking" state — wType.label is from a static frontend constant
+  // but we still escape defensively in case future code mutates it.
+  textEl.innerHTML = `<span style="opacity:0.5;">${escapeHtml(wType.label)}が考えています…</span>`;
   inputEl.disabled = true;
   inputEl.value = '';
 
@@ -3288,13 +3319,14 @@ function askWorkerLive(worker, message, inputEl) {
     .then(r => r.json().then(data => ({ status: r.status, data })))
     .then(({ status, data }) => {
       if (data.ok) {
+        // textContent — never innerHTML — for any value coming from an LLM
         textEl.textContent = data.reply;
-        // Worker speaks the response (TTS handled server-side via charge)
         ozSpeak(data.reply, 'Kyoko', 200, worker.type);
       } else if (data.reason === 'insufficient_funds') {
-        textEl.innerHTML = `<span style="color:#ff4d6d;">${wType.label}は予算が足りません (残高: ${Math.round(data.balance)} OZC)</span>`;
+        const balance = Math.round(Number(data.balance) || 0);
+        textEl.innerHTML = `<span style="color:#ff4d6d;">${escapeHtml(wType.label)}は予算が足りません (残高: ${balance} OZC)</span>`;
       } else {
-        textEl.innerHTML = `<span style="color:#ff4d6d;">エラー: ${escapeHtml(data.error || 'unknown')}</span>`;
+        textEl.innerHTML = `<span style="color:#ff4d6d;">エラー: ${escapeHtml(String(data.error || 'unknown'))}</span>`;
       }
       inputEl.disabled = false;
       inputEl.focus();

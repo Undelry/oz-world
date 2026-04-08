@@ -163,6 +163,7 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     PORT = 8766
-    with http.server.ThreadingHTTPServer(("", PORT), OZHandler) as httpd:
-        print(f"OZ Server起動: http://localhost:{PORT}")
+    # Bind to loopback only — never expose to LAN/WiFi
+    with http.server.ThreadingHTTPServer(("127.0.0.1", PORT), OZHandler) as httpd:
+        print(f"OZ Server起動: http://127.0.0.1:{PORT}")
         httpd.serve_forever()
