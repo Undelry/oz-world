@@ -14,10 +14,15 @@ import tempfile
 import threading
 import subprocess
 
+import oz_economy
+
 PORT = 8767
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
 TASK_STATUS_FILE = os.path.join(DIRECTORY, "openclaw_task_status.json")
 WORKER_STATE_FILE = os.path.join(DIRECTORY, "oz_worker_state.json")
+
+# Initialize the OZ economy database on startup
+oz_economy.init_db()
 
 # Whisper model (lazy load)
 _whisper_model = None
@@ -40,6 +45,13 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=DIRECTORY, **kwargs)
+
+    def end_headers(self):
+        # CORS for all responses (so browser can fetch local assets cross-origin)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Range")
+        super().end_headers()
 
     def log_message(self, format, *args):
         # APIリクエストとGETリクエストのみログ表示
@@ -76,6 +88,26 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(data)
             return
 
+        # === OZ Economy endpoints ===
+        if self.path == "/api/economy/balances":
+            self._send_json(oz_economy.get_all_balances())
+            return
+
+        if self.path.startswith("/api/economy/ledger"):
+            # Optional ?since=<ts>&limit=<n>
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            since = float(qs.get("since", [0])[0]) if qs.get("since") else None
+            limit = int(qs.get("limit", [50])[0])
+            self._send_json(oz_economy.get_ledger(limit=limit, since_ts=since))
+            return
+
+        if self.path == "/api/economy/stats":
+            stats = oz_economy.get_daily_stats()
+            stats["price_table"] = oz_economy.PRICE_TABLE
+            self._send_json(stats)
+            return
+
         # 静的ファイル配信にフォールバック
         super().do_GET()
 
@@ -100,12 +132,59 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
                 text = data.get("text", "")
                 voice = data.get("voice", "Kyoko")  # Kyoko=日本語, Samantha=英語
                 rate = data.get("rate", 200)
+                agent = data.get("agent", "hitomi")  # who is speaking
                 if text:
                     # Non-blocking TTS via macOS say
                     subprocess.Popen(
                         ["say", "-v", voice, "-r", str(rate), text],
                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                     )
+                    # Charge the speaking agent for TTS usage
+                    try:
+                        oz_economy.charge_action(agent, "tts.speak", text[:60])
+                    except Exception:
+                        pass
+                self._send_json({"ok": True})
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, status=500)
+            return
+
+        # === OZ Economy POST endpoints ===
+        if self.path == "/api/economy/transfer":
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            try:
+                data = json.loads(body)
+                tx = oz_economy.transfer(
+                    data["from_agent"],
+                    data["to_agent"],
+                    float(data["amount"]),
+                    data.get("action", "manual"),
+                    data.get("detail", ""),
+                )
+                self._send_json({"ok": True, "tx": tx})
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, status=400)
+            return
+
+        if self.path == "/api/economy/charge":
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            try:
+                data = json.loads(body)
+                tx = oz_economy.charge_action(
+                    data["agent"],
+                    data["action"],
+                    data.get("detail", ""),
+                )
+                self._send_json({"ok": True, "tx": tx})
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, status=400)
+            return
+
+        if self.path == "/api/economy/reset":
+            try:
+                oz_economy.reset_daily_balances()
                 self._send_json({"ok": True})
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, status=500)
@@ -127,6 +206,12 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
 
                 # Cleanup
                 os.unlink(tmp_path)
+
+                # Charge "human" account for using STT (the user spoke)
+                try:
+                    oz_economy.charge_action("human", "stt.transcribe", text[:60])
+                except Exception:
+                    pass
 
                 print(f"  Transcribed: {text}")
                 self._send_json({"ok": True, "text": text})

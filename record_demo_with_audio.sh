@@ -16,7 +16,7 @@ OZ_DIR="$(cd "$(dirname "$0")" && pwd)"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 OUTPUT="$OZ_DIR/oz_demo_audio_${TIMESTAMP}.mp4"
 AUDIO_DIR="/tmp/oz_audio_${TIMESTAMP}"
-DURATION=42
+DURATION=50
 PORT=8767
 
 mkdir -p "$AUDIO_DIR"
@@ -36,8 +36,9 @@ declare -a LINES=(
     "14.5:ワーカーたちに話しかけると、声で返事してくれます"
     "22.0:モニターを見せて"
     "26.0:紫の島に行って"
-    "30.0:全ての操作を音声だけで。PCとスマホの全てがOZの中に"
-    "37.0:OZ。新しい世界へ"
+    "29.0:そしてエージェント同士は、暗号通貨で取引しています"
+    "33.0:全てのタスク、LLM呼び出し、通知がOZコインで精算されます"
+    "38.0:OZ。AIエージェントが、自律的に経済を回す世界"
 )
 
 for i in "${!LINES[@]}"; do
@@ -121,33 +122,38 @@ osascript -e 'tell application "Arc" to activate' > /dev/null
 sleep 0.5
 
 # Get Arc WebView position+size via Accessibility (AXSplitGroup is the web area).
-# This excludes Arc's left sidebar and top URL bar — exactly what we want.
+# Search ALL windows (not just front) since the OZ tab may not be in window 1.
 WEBVIEW_INFO=$(osascript << 'OSAEOF' 2>/dev/null
 tell application "Arc" to activate
-delay 0.3
+delay 0.5
 tell application "System Events"
     tell process "Arc"
+        set bestResult to ""
+        set bestArea to 0
         repeat with i from 1 to count of windows
             try
                 set w to window i
-                set wn to name of w
-                if wn contains "OZ" or wn contains "Virtual" or wn contains "localhost" then
-                    set elemList to entire contents of w
-                    repeat with elem in elemList
-                        try
-                            if role of elem is "AXSplitGroup" then
-                                set p to position of elem
-                                set s to size of elem
-                                return ((item 1 of p) as text) & "," & ((item 2 of p) as text) & "," & ((item 1 of s) as text) & "," & ((item 2 of s) as text)
+                set elemList to entire contents of w
+                repeat with elem in elemList
+                    try
+                        if role of elem is "AXSplitGroup" then
+                            set p to position of elem
+                            set s to size of elem
+                            set a to (item 1 of s) * (item 2 of s)
+                            -- Pick the largest split group (which is the actual webview)
+                            if a > bestArea then
+                                set bestArea to a
+                                set bestResult to ((item 1 of p) as text) & "," & ((item 2 of p) as text) & "," & ((item 1 of s) as text) & "," & ((item 2 of s) as text)
                             end if
-                        end try
-                    end repeat
-                end if
+                        end if
+                    end try
+                end repeat
             end try
         end repeat
+        if bestResult is not "" then return bestResult
     end tell
 end tell
-return "0,0,1470,956"
+return "242,83,1218,863"
 OSAEOF
 )
 

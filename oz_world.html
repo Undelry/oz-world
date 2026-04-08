@@ -415,6 +415,108 @@
   }
   #voiceTextInput input:focus { border-color: #118ab2; }
 
+  /* === OZ Economy === */
+  #economyPanel {
+    position: fixed;
+    top: 60px;
+    right: 12px;
+    width: 256px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 209, 102, 0.5);
+    border-radius: 14px;
+    padding: 12px 14px;
+    z-index: 95;
+    font-size: 11px;
+    color: #333;
+    box-shadow: 0 4px 24px rgba(255, 209, 102, 0.15);
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  /* Show economy panel in demo mode (it's the highlight feature) */
+  #economyPanel .econ-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(0,0,0,0.5);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  #economyPanel .econ-title::before {
+    content: "🪙";
+    font-size: 14px;
+  }
+  .econ-stat {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-variant-numeric: tabular-nums;
+  }
+  .econ-stat-label { color: rgba(0,0,0,0.45); font-size: 10px; }
+  .econ-stat-val { font-weight: 600; color: #333; }
+  .econ-bar {
+    width: 100%;
+    height: 4px;
+    background: rgba(0,0,0,0.06);
+    border-radius: 2px;
+    margin-top: 4px;
+    overflow: hidden;
+  }
+  .econ-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #06d6a0, #ffd166, #ff4d6d);
+    transition: width 0.5s;
+  }
+  .econ-section {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(0,0,0,0.06);
+  }
+  .econ-balance-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+    font-size: 11px;
+  }
+  .econ-balance-row .agent-name { color: rgba(0,0,0,0.6); }
+  .econ-balance-row .agent-coin { font-weight: 600; color: #b8860b; font-variant-numeric: tabular-nums; }
+  .econ-tx-row {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 0;
+    border-bottom: 1px dashed rgba(0,0,0,0.04);
+    font-size: 10px;
+  }
+  .econ-tx-row:last-child { border-bottom: none; }
+  .econ-tx-flow {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: rgba(0,0,0,0.6);
+  }
+  .econ-tx-flow .arrow { color: #ffd166; font-weight: 700; }
+  .econ-tx-amount { color: #b8860b; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .econ-tx-action { color: rgba(0,0,0,0.4); font-size: 9px; margin-top: 1px; }
+
+  /* Bottom bar coin indicator */
+  .ctrl-coin {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(255, 209, 102, 0.12);
+    border: 1px solid rgba(255, 209, 102, 0.3);
+    font-size: 10px;
+    color: #b8860b;
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+
   /* === Dialog Bubble === */
   #dialogBubble {
     position: fixed;
@@ -519,6 +621,81 @@
     border: 1px solid rgba(0,0,0,0.05);
   }
   #proximityHint.show { opacity: 1; }
+
+  /* === VTuber Avatar Overlay === */
+  #vtuber-avatar {
+    position: fixed;
+    bottom: 60px;
+    right: 280px;
+    width: 200px;
+    height: 220px;
+    z-index: 300;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.6s;
+  }
+  /* When in demo mode without sidebar, position differently */
+  body.demo-mode #vtuber-avatar {
+    right: 30px;
+  }
+  body.demo-mode #sidebar { display: none; }
+  #vtuber-avatar.show { opacity: 1; }
+  #vtuber-avatar .avatar-frame {
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid rgba(139, 92, 246, 0.6);
+    box-shadow: 0 4px 24px rgba(139, 92, 246, 0.3), 0 0 0 4px rgba(255,255,255,0.8);
+    background: linear-gradient(135deg, rgba(139,92,246,0.1), rgba(236,72,153,0.1));
+  }
+  #vtuber-avatar canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  #vtuber-avatar .avatar-name {
+    text-align: center;
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(139, 92, 246, 0.8);
+    margin-top: 4px;
+    letter-spacing: 1px;
+  }
+  /* Lip-sync animation */
+  #vtuber-avatar.talking .avatar-frame {
+    animation: lipSync 0.15s ease-in-out infinite alternate;
+  }
+  @keyframes lipSync {
+    0% { transform: scaleY(1); }
+    100% { transform: scaleY(0.97); border-color: rgba(236, 72, 153, 0.7); }
+  }
+  #vtuber-avatar.talking .avatar-frame {
+    box-shadow: 0 4px 24px rgba(236, 72, 153, 0.4), 0 0 0 4px rgba(255,255,255,0.8);
+  }
+
+  /* === Demo Subtitle === */
+  #demo-subtitle {
+    position: fixed;
+    bottom: 240px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    padding: 10px 28px;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    z-index: 310;
+    opacity: 0;
+    transition: opacity 0.4s;
+    pointer-events: none;
+    max-width: 600px;
+    text-align: center;
+    white-space: nowrap;
+  }
+  #demo-subtitle.show { opacity: 1; }
 </style>
 </head>
 <body>
@@ -591,7 +768,8 @@
     <span class="voice-mic-label" id="voiceMicLabel">OFF</span>
   </div>
   <span class="spacer"></span>
-  <span class="position-info" id="posInfo">x:0 y:0 z:0</span>
+  <span class="ctrl-coin" id="ctrlCoin" title="Today's OZC consumption">🪙 0 / 5000 OZC</span>
+  <span class="position-info" id="posInfo" style="margin-left:12px;">x:0 y:0 z:0</span>
 </div>
 
 <!-- Notification -->
@@ -599,6 +777,30 @@
 
 <!-- Voice Transcript Overlay -->
 <div id="voiceTranscript"><span class="transcript-prefix">🎤</span><span id="transcriptText"></span></div>
+
+<!-- OZ Economy Panel -->
+<div id="economyPanel">
+  <div class="econ-title">OZ Economy</div>
+  <div class="econ-stat">
+    <span class="econ-stat-label">Today spent</span>
+    <span class="econ-stat-val" id="econSpent">0 OZC</span>
+  </div>
+  <div class="econ-stat">
+    <span class="econ-stat-label">Daily cap</span>
+    <span class="econ-stat-val" id="econCap">5000 OZC</span>
+  </div>
+  <div class="econ-bar"><div class="econ-bar-fill" id="econBarFill" style="width: 0%"></div></div>
+
+  <div class="econ-section">
+    <div class="econ-stat-label" style="margin-bottom:6px;">BALANCES</div>
+    <div id="econBalances"></div>
+  </div>
+
+  <div class="econ-section">
+    <div class="econ-stat-label" style="margin-bottom:6px;">RECENT TX</div>
+    <div id="econTxList"></div>
+  </div>
+</div>
 
 <!-- Voice Panel -->
 <div id="voicePanel">
@@ -620,6 +822,17 @@
 
 <!-- Proximity Hint -->
 <div id="proximityHint">Press <b>E</b> to talk</div>
+
+<!-- VTuber Avatar Overlay -->
+<div id="vtuber-avatar">
+  <div class="avatar-frame">
+    <canvas id="vtuber-canvas" width="256" height="256"></canvas>
+  </div>
+  <div class="avatar-name">NAVIGATOR</div>
+</div>
+
+<!-- Demo Subtitle -->
+<div id="demo-subtitle"></div>
 
 <!-- Three.js Container -->
 <div id="three-container"></div>
@@ -1799,6 +2012,287 @@ function updateMails(t) {
   }
 }
 
+// ============================
+// OZ Economy — Coin Animations & Polling
+// ============================
+const flyingCoins = [];
+
+function createCoinSprite(amount) {
+  // Render a small canvas with the coin + amount
+  const canvas = document.createElement('canvas');
+  canvas.width = 64; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  // Glow
+  const grad = ctx.createRadialGradient(32, 32, 8, 32, 32, 30);
+  grad.addColorStop(0, 'rgba(255,209,102,1)');
+  grad.addColorStop(0.5, 'rgba(255,209,102,0.4)');
+  grad.addColorStop(1, 'rgba(255,209,102,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 64, 64);
+  // Coin
+  ctx.beginPath();
+  ctx.arc(32, 32, 20, 0, Math.PI * 2);
+  const coinGrad = ctx.createRadialGradient(28, 28, 4, 32, 32, 22);
+  coinGrad.addColorStop(0, '#fff8d9');
+  coinGrad.addColorStop(0.5, '#ffd166');
+  coinGrad.addColorStop(1, '#b8860b');
+  ctx.fillStyle = coinGrad;
+  ctx.fill();
+  ctx.strokeStyle = '#8b6914';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // OZ letter
+  ctx.fillStyle = '#5a4400';
+  ctx.font = 'bold 16px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('OZ', 32, 32);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, opacity: 0.95,
+  }));
+  sprite.scale.set(0.7, 0.7, 1);
+  return sprite;
+}
+
+function spawnFlyingCoin(fromPos, toPos, amount) {
+  const sprite = createCoinSprite(amount);
+  sprite.position.copy(fromPos);
+  scene.add(sprite);
+
+  const mid = new THREE.Vector3().addVectors(fromPos, toPos).multiplyScalar(0.5);
+  mid.y += 4 + Math.random() * 2;
+
+  flyingCoins.push({
+    sprite,
+    fromPos: fromPos.clone(),
+    toPos: toPos.clone(),
+    midPos: mid,
+    progress: 0,
+    speed: 0.012 + Math.random() * 0.005,
+    rotPhase: Math.random() * Math.PI * 2,
+  });
+}
+
+function updateFlyingCoins(t) {
+  for (let i = flyingCoins.length - 1; i >= 0; i--) {
+    const c = flyingCoins[i];
+    c.progress += c.speed;
+    if (c.progress >= 1) {
+      scene.remove(c.sprite);
+      flyingCoins.splice(i, 1);
+      continue;
+    }
+    const p = c.progress;
+    const inv = 1 - p;
+    c.sprite.position.set(
+      inv * inv * c.fromPos.x + 2 * inv * p * c.midPos.x + p * p * c.toPos.x,
+      inv * inv * c.fromPos.y + 2 * inv * p * c.midPos.y + p * p * c.toPos.y,
+      inv * inv * c.fromPos.z + 2 * inv * p * c.midPos.z + p * p * c.toPos.z,
+    );
+    // Spinning effect via scale
+    const spin = Math.sin(t * 6 + c.rotPhase);
+    c.sprite.scale.set(0.7 * Math.abs(spin) * 0.5 + 0.4, 0.7, 1);
+  }
+}
+
+// Worker balance label sprites (created lazily)
+const workerBalanceLabels = {};
+
+function createBalanceLabel(amount) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128; canvas.height = 36;
+  const ctx = canvas.getContext('2d');
+  // Background pill
+  ctx.fillStyle = 'rgba(255, 248, 220, 0.95)';
+  ctx.strokeStyle = '#b8860b';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(2, 2, 124, 32, 10);
+  else { ctx.rect(2, 2, 124, 32); }
+  ctx.fill();
+  ctx.stroke();
+  // Coin emoji
+  ctx.font = '18px serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('🪙', 8, 18);
+  // Amount
+  ctx.fillStyle = '#5a4400';
+  ctx.font = 'bold 14px Inter, sans-serif';
+  ctx.fillText(Math.round(amount) + ' OZC', 32, 19);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function ensureBalanceLabel(workerType, amount) {
+  let label = workerBalanceLabels[workerType];
+  if (!label) {
+    const tex = createBalanceLabel(amount);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: tex, transparent: true, opacity: 0.92,
+    }));
+    sprite.scale.set(1.6, 0.45, 1);
+    scene.add(sprite);
+    label = { sprite, lastAmount: amount };
+    workerBalanceLabels[workerType] = label;
+  } else if (label.lastAmount !== amount) {
+    label.sprite.material.map = createBalanceLabel(amount);
+    label.sprite.material.map.needsUpdate = true;
+    label.lastAmount = amount;
+  }
+  return label;
+}
+
+function updateWorkerBalanceLabels() {
+  workers.forEach(w => {
+    const label = workerBalanceLabels[w.type];
+    if (label) {
+      label.sprite.position.set(
+        w.group.position.x,
+        w.group.position.y + 4.0,
+        w.group.position.z,
+      );
+    }
+  });
+}
+
+// Resolve a worker type to a 3D position (or hitomi tower for orchestrator)
+function getAgentWorldPos(agentName) {
+  if (agentName === 'hitomi' || agentName === 'treasury' || agentName === 'human') {
+    return new THREE.Vector3(
+      hitomiTowerGroup.position.x,
+      hitomiTowerGroup.position.y + 7,
+      hitomiTowerGroup.position.z,
+    );
+  }
+  const w = workers.find(ww => ww.type === agentName);
+  if (w) {
+    return new THREE.Vector3(w.group.position.x, w.group.position.y + 2, w.group.position.z);
+  }
+  return null;
+}
+
+// Polling: keep balances + ledger fresh from server
+const economyState = {
+  balances: {},
+  recentTxIds: new Set(),
+  lastTxTs: 0,
+  spent: 0,
+  cap: 5000,
+};
+
+function fetchEconomyState() {
+  fetch('/api/economy/balances')
+    .then(r => r.json())
+    .then(data => {
+      economyState.balances = data;
+      // Update worker balance labels
+      Object.entries(data).forEach(([agent, balance]) => {
+        if (workers.find(w => w.type === agent)) {
+          ensureBalanceLabel(agent, balance);
+        }
+      });
+      renderEconomyPanel();
+    })
+    .catch(() => {});
+
+  fetch('/api/economy/stats')
+    .then(r => r.json())
+    .then(data => {
+      economyState.spent = data.spent_today;
+      economyState.cap = data.daily_cap;
+      const pct = Math.min(100, (data.spent_today / data.daily_cap) * 100);
+      document.getElementById('econBarFill').style.width = pct + '%';
+      document.getElementById('econSpent').textContent = Math.round(data.spent_today) + ' OZC';
+      document.getElementById('econCap').textContent = Math.round(data.daily_cap) + ' OZC';
+      document.getElementById('ctrlCoin').textContent =
+        `🪙 ${Math.round(data.spent_today)} / ${Math.round(data.daily_cap)} OZC`;
+    })
+    .catch(() => {});
+
+  fetch(`/api/economy/ledger?since=${economyState.lastTxTs}&limit=20`)
+    .then(r => r.json())
+    .then(txs => {
+      // Animate any new transactions
+      const newTxs = txs.filter(tx => !economyState.recentTxIds.has(tx.id));
+      newTxs.reverse().forEach(tx => {
+        economyState.recentTxIds.add(tx.id);
+        if (tx.ts > economyState.lastTxTs) economyState.lastTxTs = tx.ts;
+        animateTransaction(tx);
+      });
+      // Keep memory bounded
+      if (economyState.recentTxIds.size > 200) {
+        const arr = Array.from(economyState.recentTxIds);
+        economyState.recentTxIds = new Set(arr.slice(-100));
+      }
+      renderTxList(txs.slice(0, 8));
+    })
+    .catch(() => {});
+}
+
+function animateTransaction(tx) {
+  const fromPos = getAgentWorldPos(tx.from_agent);
+  const toPos = getAgentWorldPos(tx.to_agent);
+  if (fromPos && toPos) {
+    spawnFlyingCoin(fromPos, toPos, tx.amount);
+  }
+}
+
+function renderEconomyPanel() {
+  const el = document.getElementById('econBalances');
+  if (!el) return;
+  const order = ['hitomi', 'coder', 'researcher', 'reviewer', 'debugger', 'writer', 'scheduler'];
+  el.innerHTML = order.map(name => {
+    const bal = economyState.balances[name];
+    if (bal === undefined) return '';
+    const wType = WORKER_TYPES[name];
+    const display = wType ? `${wType.emoji} ${wType.label}` : name;
+    return `<div class="econ-balance-row">
+      <span class="agent-name">${display}</span>
+      <span class="agent-coin">${Math.round(bal)}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderTxList(txs) {
+  const el = document.getElementById('econTxList');
+  if (!el) return;
+  if (txs.length === 0) {
+    el.innerHTML = '<div style="color:rgba(0,0,0,0.3);font-size:10px;">No transactions yet</div>';
+    return;
+  }
+  el.innerHTML = txs.map(tx => {
+    return `<div class="econ-tx-row">
+      <div class="econ-tx-flow">
+        <span>${shortName(tx.from_agent)}</span>
+        <span class="arrow">→</span>
+        <span>${shortName(tx.to_agent)}</span>
+        <span style="margin-left:auto;" class="econ-tx-amount">${Math.round(tx.amount)} OZC</span>
+      </div>
+      <div class="econ-tx-action">${tx.action}${tx.detail ? ' · ' + escapeHtml(tx.detail).slice(0, 30) : ''}</div>
+    </div>`;
+  }).join('');
+}
+
+function shortName(agent) {
+  const wType = WORKER_TYPES[agent];
+  if (wType) return wType.emoji;
+  const map = { hitomi: '🤖', treasury: '🏦', human: '👤' };
+  return map[agent] || agent;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+// Poll economy state every 1.5s
+setInterval(fetchEconomyState, 1500);
+fetchEconomyState();
+
+
 // Periodic mail sending (hitomi assigning tasks)
 let lastMailTime = 0;
 function maybeDeliverMail(t) {
@@ -1820,15 +2314,19 @@ function maybeDeliverMail(t) {
 
   // Randomly choose direction: hitomi -> worker or worker -> hitomi
   if (Math.random() > 0.4) {
-    // hitomi assigns task
+    // hitomi assigns task with budget
+    const budget = 20 + Math.floor(Math.random() * 40);
     sendMail(hitomiPos, targetPos, wType.color, () => {
-      showNotification(`hitomi → ${wType.emoji} ${wType.label}: New task assigned`);
+      showNotification(`hitomi → ${wType.emoji} ${wType.label}: New task (${budget} OZC)`);
     });
+    ozTransfer('hitomi', target.type, budget, 'task.assign', target.task || 'task');
   } else {
-    // Worker reports back
+    // Worker reports back, returns unused budget
+    const refund = 5 + Math.floor(Math.random() * 15);
     sendMail(targetPos, hitomiPos, wType.color, () => {
-      showNotification(`${wType.emoji} ${wType.label} → hitomi: Progress report`);
+      showNotification(`${wType.emoji} ${wType.label} → hitomi: Progress (+${refund} OZC)`);
     });
+    ozTransfer(target.type, 'hitomi', refund, 'task.report', 'progress');
   }
 }
 
@@ -1846,6 +2344,8 @@ function assignWork(worker) {
     sendMail(hitomiPos, worker.group.position.clone().add(new THREE.Vector3(0, 2, 0)), wType.color, () => {
       showNotification(`hitomi → ${wType.emoji} ${wType.label}: Task assigned!`);
     });
+    // Pay budget for the task
+    ozTransfer('hitomi', worker.type, 50, 'task.assign', worker.task || 'task');
   }
 }
 
@@ -1860,6 +2360,8 @@ function releaseWorker(worker) {
     sendMail(worker.group.position.clone().add(new THREE.Vector3(0, 2, 0)), hitomiPos, wType.color, () => {
       showNotification(`${wType.emoji} ${wType.label} → hitomi: Task complete!`);
     });
+    // Worker returns earnings to hitomi when done (75% return = 25% kept as wages)
+    ozTransfer(worker.type, 'hitomi', 30, 'task.report', 'task complete');
   }
 }
 
@@ -1966,8 +2468,8 @@ function updateDialogContent(worker, page) {
     `;
   }
 
-  // TTS — worker speaks the text aloud
-  if (spokenText) ozSpeak(spokenText);
+  // TTS — worker speaks the text aloud (charged to the worker)
+  if (spokenText) ozSpeak(spokenText, 'Kyoko', 200, worker.type);
 
   // Attach click handlers
   optionsEl.querySelectorAll('.dialog-option').forEach(opt => {
@@ -2753,6 +3255,10 @@ function animate() {
   }
   particles.geometry.attributes.position.needsUpdate = true;
 
+  // --- OZ Economy: coin animations + balance label positions ---
+  updateFlyingCoins(t);
+  updateWorkerBalanceLabels();
+
   // --- Voice navigator camera tween ---
   voiceNavigator.update();
 
@@ -3262,11 +3768,26 @@ voiceController.onCommand = (text) => {
 // ============================
 // TTS — Workers speak back
 // ============================
-function ozSpeak(text, voice = 'Kyoko', rate = 200) {
+function ozSpeak(text, voice = 'Kyoko', rate = 200, agent = 'hitomi') {
   fetch('/api/speak', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, voice, rate }),
+    body: JSON.stringify({ text, voice, rate, agent }),
+  }).catch(() => {});
+}
+
+// Helper: post a transfer to the OZ economy from the browser
+function ozTransfer(fromAgent, toAgent, amount, action, detail = '') {
+  fetch('/api/economy/transfer', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from_agent: fromAgent,
+      to_agent: toAgent,
+      amount,
+      action,
+      detail,
+    }),
   }).catch(() => {});
 }
 
@@ -3279,6 +3800,58 @@ setTimeout(() => {
 
 connectWS();
 animate();
+
+
+// ============================
+// Demo Mode (VTuber walkthrough)
+// URL: ?demo=1
+// ============================
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('demo') === '1') {
+  // Hide sidebar in demo mode for cleaner recording
+  document.body.classList.add('demo-mode');
+
+  // Load oz_demo.js dynamically
+  const demoScript = document.createElement('script');
+  demoScript.src = 'oz_demo.js';
+  demoScript.onload = () => {
+    const demo = new window.OZDemoController();
+
+    // Show avatar
+    const avatarEl = document.getElementById('vtuber-avatar');
+    avatarEl.classList.add('show');
+
+    // Draw initial avatar
+    demo.setAvatar('smile');
+
+    // Start demo after loading screen disappears
+    setTimeout(() => {
+      demo.start({
+        voiceNavigator,
+        showDialog,
+        hideDialog,
+        workers,
+        WORKER_TYPES,
+        camera,
+        controls,
+        scene,
+        showNotification,
+        ozSpeak,
+        switchToFirstPerson,
+        switchToOrbital,
+        THREE,
+      });
+
+      // Hook demo update into a separate frame loop
+      function demoLoop() {
+        demo.update();
+        if (demo.running) requestAnimationFrame(demoLoop);
+      }
+      demoLoop();
+    }, 2500); // Wait for loading screen to finish
+  };
+  document.body.appendChild(demoScript);
+}
 
 </script>
 </body>
