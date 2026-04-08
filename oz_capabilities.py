@@ -127,6 +127,29 @@ WORKER_CAPABILITIES: dict[str, dict[str, Permission]] = {
         "shell.exec":      Permission.DENY,
         "file.delete":     Permission.DENY,
     },
+    # iPhone-bridge: Continuity-based (Messages, Reminders, Calendar, Photos)
+    "iphone-bridge": {
+        "llm.claude":      Permission.ALWAYS,
+        "tts.speak":       Permission.ALWAYS,
+        # 読み取り系は always
+        "iphone.messages.read":  Permission.ALWAYS,
+        "iphone.calls.read":     Permission.ALWAYS,
+        "iphone.photos.read":    Permission.ALWAYS,
+        "iphone.calendar.read":  Permission.ALWAYS,
+        "iphone.contacts.read":  Permission.ALWAYS,
+        "iphone.reminders.read": Permission.ALWAYS,
+        "iphone.audio.read":     Permission.ALWAYS,
+        # 作成系はユーザー承認
+        "iphone.reminders.add":  Permission.USER_APPROVE,
+        # 送信系もユーザー承認
+        "iphone.messages.send":  Permission.USER_APPROVE,
+        "iphone.call.place":     Permission.USER_APPROVE,
+        # Bash経由で oz_iphone.py を呼ぶため
+        "shell.exec":            Permission.USER_APPROVE,
+        # 危険な操作は禁止
+        "external.http":         Permission.DENY,
+        "file.delete":           Permission.DENY,
+    },
     # macOS-bridge: Bash + osascript via Claude CLI
     # User approval is enforced by Claude Code CLI's own permission prompts.
     # OZ-level gate just makes sure the agent can be invoked at all.

@@ -87,6 +87,7 @@ INITIAL_BALANCES = {
     "writer": 250,
     "scheduler": 150,
     "macos-bridge": 200,    # macOS操作担当 (CLI 経由で osascript)
+    "iphone-bridge": 200,   # iPhone操作担当 (Continuity 経由)
     "human": 100000,        # ユーザー本人 (仮想口座)
     "treasury": 1000000,    # システム口座 (鋳造元)
 }

@@ -133,6 +133,28 @@ WORKER_PROFILES = {
         "working_dir": "~",
         "max_cost_ozc": 40,
     },
+    # iPhone 専用ワーカー — Continuity経由で Messages, Reminders, Calendar, Photos
+    "iphone-bridge": {
+        "label": "iPhone Bridge",
+        "model": "claude-haiku-4-5",
+        "allowed_tools": "Bash,Read",
+        "system": (
+            "あなたはOZのiPhone操作担当エージェントです。"
+            "macOSのContinuity機能経由で iPhone と連携します。"
+            "/Users/maekawasei/Desktop/OZ/oz_iphone.py を Bash で呼び出して"
+            "iMessage, リマインダー, カレンダー, 写真, 連絡先, 通話履歴を扱います。\n\n"
+            "重要なルール:\n"
+            "- 読み取り (recent_messages, recent_photos, calendar_today, "
+            "  list-reminders, contacts, calls, audio, airpods) は自由に使ってよい\n"
+            "- 送信系 (send_imessage, place_call) は呼ばない (まだテスト段階)\n"
+            "- 作成 (add_reminder) はユーザーから明示的に頼まれた時のみ\n"
+            "- python3 /Users/maekawasei/Desktop/OZ/oz_iphone.py <command> 形式で呼ぶ\n"
+            "- 結果は1〜3文の日本語要約で報告\n"
+            "- rm, sudo, > は絶対実行しない"
+        ),
+        "working_dir": "~",
+        "max_cost_ozc": 30,
+    },
     # macOS 専用ワーカー — Bash + osascript の skill を使う
     "macos-bridge": {
         "label": "macOS Bridge",
