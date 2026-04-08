@@ -15,6 +15,8 @@ import threading
 import subprocess
 
 import oz_economy
+import oz_agents
+import oz_bidding
 
 PORT = 8767
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
@@ -108,6 +110,10 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(stats)
             return
 
+        if self.path == "/api/economy/verify":
+            self._send_json(oz_economy.verify_chain())
+            return
+
         # 静的ファイル配信にフォールバック
         super().do_GET()
 
@@ -186,6 +192,66 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
             try:
                 oz_economy.reset_daily_balances()
                 self._send_json({"ok": True})
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, status=500)
+            return
+
+        if self.path == "/api/economy/topup":
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            try:
+                data = json.loads(body)
+                agent = data.get("agent", "hitomi")
+                amount = float(data.get("amount", 0))
+                source = data.get("source", "manual")
+                tx = oz_economy.topup(agent, amount, source)
+                self._send_json({"ok": True, "tx": tx})
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, status=400)
+            return
+
+        # === Bidding — agents bid on tasks ===
+        if self.path == "/api/bidding/bids":
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            try:
+                data = json.loads(body)
+                task = data.get("task", "")
+                bids = oz_bidding.collect_bids(task)
+                self._send_json({"ok": True, "task": task, "bids": bids})
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, status=500)
+            return
+
+        if self.path == "/api/bidding/auction":
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            try:
+                data = json.loads(body)
+                task = data.get("task", "")
+                budget = data.get("max_budget")
+                result = oz_bidding.run_auction(task, max_budget=budget)
+                status = 200 if result.get("ok") else 400
+                self._send_json(result, status=status)
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, status=500)
+            return
+
+        # === Agents — workers actually call Claude ===
+        if self.path == "/api/agents/ask":
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            try:
+                data = json.loads(body)
+                agent = data.get("agent", "hitomi")
+                message = data.get("message", "")
+                if not message:
+                    self._send_json({"ok": False, "error": "message required"}, status=400)
+                    return
+                # Run Claude call in a worker thread so the HTTP server stays responsive
+                result = oz_agents.ask_agent(agent, message, timeout=45)
+                status = 200 if result.get("ok") else 402  # 402 Payment Required when broke
+                self._send_json(result, status=status)
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, status=500)
             return

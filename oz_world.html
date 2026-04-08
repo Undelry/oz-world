@@ -502,6 +502,135 @@
   .econ-tx-amount { color: #b8860b; font-weight: 600; font-variant-numeric: tabular-nums; }
   .econ-tx-action { color: rgba(0,0,0,0.4); font-size: 9px; margin-top: 1px; }
 
+  /* === Task auction modal === */
+  #auctionModal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 480px;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(20px);
+    border-radius: 16px;
+    padding: 24px;
+    z-index: 500;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+    border: 1px solid rgba(255, 209, 102, 0.4);
+    display: none;
+  }
+  #auctionModal.show { display: block; }
+  #auctionModal h3 {
+    font-size: 14px;
+    color: #333;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #auctionModal h3::before { content: "🪙"; }
+  #auctionModal input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid rgba(0,0,0,0.08);
+    border-radius: 10px;
+    font-size: 13px;
+    font-family: 'Inter', sans-serif;
+    margin-bottom: 14px;
+    outline: none;
+  }
+  #auctionModal input:focus { border-color: #ffd166; }
+  #auctionModal .auction-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-bottom: 14px;
+  }
+  #auctionModal button {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: none;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  #auctionModal button.btn-primary {
+    background: linear-gradient(135deg, #ffd166, #ff8a5c);
+    color: #fff;
+  }
+  #auctionModal button.btn-secondary {
+    background: rgba(0,0,0,0.05);
+    color: #555;
+  }
+  #auctionModal button:hover { transform: translateY(-1px); }
+  #auctionBidsList {
+    max-height: 280px;
+    overflow-y: auto;
+    border-top: 1px solid rgba(0,0,0,0.05);
+    padding-top: 10px;
+  }
+  .bid-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    margin-bottom: 4px;
+    transition: all 0.4s;
+  }
+  .bid-row.winner {
+    background: rgba(255, 209, 102, 0.18);
+    box-shadow: 0 0 0 1px rgba(255, 209, 102, 0.5);
+  }
+  .bid-row .bid-rank {
+    font-size: 10px;
+    width: 18px;
+    color: rgba(0,0,0,0.4);
+    text-align: center;
+  }
+  .bid-row .bid-emoji { font-size: 16px; }
+  .bid-row .bid-name { flex: 1; font-size: 12px; color: #333; }
+  .bid-row .bid-amount {
+    font-size: 13px;
+    font-weight: 700;
+    color: #b8860b;
+    font-variant-numeric: tabular-nums;
+  }
+  .bid-row.winner .bid-amount { color: #ff8a5c; }
+
+  /* Quick task button in bottom bar */
+  .ctrl-task {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(255, 138, 92, 0.12);
+    border: 1px solid rgba(255, 138, 92, 0.3);
+    font-size: 10px;
+    color: #c2410c;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .ctrl-task:hover {
+    background: rgba(255, 138, 92, 0.2);
+  }
+
+  .topup-btn {
+    flex: 1 1 calc(50% - 6px);
+    padding: 6px 0;
+    border: none;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #ffd166, #ff8a5c);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .topup-btn:hover { transform: translateY(-1px); }
+
   /* Bottom bar coin indicator */
   .ctrl-coin {
     display: flex;
@@ -600,6 +729,29 @@
   #dialogBubble .dialog-option:hover {
     background: rgba(0,0,0,0.06);
     color: #333;
+  }
+  #dialogAskBox {
+    margin-top: 12px;
+    display: flex;
+    justify-content: center;
+  }
+  #dialogAskBox input {
+    width: 90%;
+    padding: 8px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(17, 138, 178, 0.3);
+    background: rgba(255, 255, 255, 0.95);
+    font-size: 11px;
+    font-family: 'Inter', sans-serif;
+    color: #333;
+    outline: none;
+  }
+  #dialogAskBox input:focus {
+    border-color: #118ab2;
+    box-shadow: 0 0 0 2px rgba(17, 138, 178, 0.15);
+  }
+  #dialogAskBox input:disabled {
+    opacity: 0.5;
   }
 
   /* Proximity hint */
@@ -768,7 +920,8 @@
     <span class="voice-mic-label" id="voiceMicLabel">OFF</span>
   </div>
   <span class="spacer"></span>
-  <span class="ctrl-coin" id="ctrlCoin" title="Today's OZC consumption">🪙 0 / 5000 OZC</span>
+  <span class="ctrl-task" id="ctrlTask" title="Open task auction (B)">📋 Auction</span>
+  <span class="ctrl-coin" id="ctrlCoin" title="Today's OZC consumption" style="margin-left:6px;">🪙 0 / 5000 OZC</span>
   <span class="position-info" id="posInfo" style="margin-left:12px;">x:0 y:0 z:0</span>
 </div>
 
@@ -790,6 +943,10 @@
     <span class="econ-stat-val" id="econCap">5000 OZC</span>
   </div>
   <div class="econ-bar"><div class="econ-bar-fill" id="econBarFill" style="width: 0%"></div></div>
+  <div class="econ-stat" style="margin-top:6px;">
+    <span class="econ-stat-label">Chain</span>
+    <span class="econ-stat-val" id="econChainStatus" title="ledger blockchain integrity">⏳ checking</span>
+  </div>
 
   <div class="econ-section">
     <div class="econ-stat-label" style="margin-bottom:6px;">BALANCES</div>
@@ -799,6 +956,19 @@
   <div class="econ-section">
     <div class="econ-stat-label" style="margin-bottom:6px;">RECENT TX</div>
     <div id="econTxList"></div>
+  </div>
+
+  <div class="econ-section">
+    <div class="econ-stat-label" style="margin-bottom:6px;">TOPUP</div>
+    <div style="display:flex; gap:6px; flex-wrap: wrap;">
+      <button class="topup-btn" data-amount="100">+100</button>
+      <button class="topup-btn" data-amount="500">+500</button>
+      <button class="topup-btn" data-amount="1000">+1000</button>
+      <button class="topup-btn" data-amount="5000">+5000</button>
+    </div>
+    <label style="display:flex; align-items:center; gap:6px; margin-top:8px; font-size:10px; color:rgba(0,0,0,0.5);">
+      <input type="checkbox" id="autoTopupCheck" style="margin:0;"> Auto-topup when low
+    </label>
   </div>
 </div>
 
@@ -817,11 +987,26 @@
   <div class="dialog-text" id="dialogText"></div>
   <div class="dialog-skills" id="dialogSkills"></div>
   <div class="dialog-options" id="dialogOptions"></div>
+  <div id="dialogAskBox">
+    <input type="text" id="dialogAskInput" placeholder="自由に話しかける… (Enter で送信、5 OZC消費)" autocomplete="off">
+  </div>
   <div class="dialog-hint">Press E or click to dismiss</div>
 </div>
 
 <!-- Proximity Hint -->
 <div id="proximityHint">Press <b>E</b> to talk</div>
+
+<!-- Task Auction Modal -->
+<div id="auctionModal">
+  <h3>Task Auction</h3>
+  <input type="text" id="auctionTaskInput" placeholder="タスクを入力 (例: APIの実装、ドキュメント翻訳…)" autocomplete="off">
+  <div class="auction-actions">
+    <button class="btn-secondary" id="auctionClose">Cancel</button>
+    <button class="btn-primary" id="auctionRun">Get Bids</button>
+    <button class="btn-primary" id="auctionAward" style="display:none;">Award to Winner</button>
+  </div>
+  <div id="auctionBidsList"></div>
+</div>
 
 <!-- VTuber Avatar Overlay -->
 <div id="vtuber-avatar">
@@ -2288,9 +2473,282 @@ function escapeHtml(s) {
   }[c]));
 }
 
+// Verify the chain integrity periodically (every 6s)
+function verifyChain() {
+  fetch('/api/economy/verify')
+    .then(r => r.json())
+    .then(data => {
+      const el = document.getElementById('econChainStatus');
+      if (data.ok) {
+        el.innerHTML = `✅ valid (${data.total} blocks)`;
+        el.style.color = '#06d6a0';
+      } else {
+        el.innerHTML = `❌ broken at #${data.broken_at}`;
+        el.style.color = '#ff4d6d';
+      }
+    })
+    .catch(() => {});
+}
+setInterval(verifyChain, 6000);
+verifyChain();
+
 // Poll economy state every 1.5s
 setInterval(fetchEconomyState, 1500);
 fetchEconomyState();
+
+
+// ============================
+// Task Auction
+// ============================
+const auctionState = {
+  task: '',
+  bids: [],
+};
+
+function openAuction() {
+  document.getElementById('auctionModal').classList.add('show');
+  document.getElementById('auctionTaskInput').value = '';
+  document.getElementById('auctionTaskInput').focus();
+  document.getElementById('auctionBidsList').innerHTML = '';
+  document.getElementById('auctionAward').style.display = 'none';
+  auctionState.task = '';
+  auctionState.bids = [];
+}
+
+function closeAuction() {
+  document.getElementById('auctionModal').classList.remove('show');
+}
+
+function fetchBids() {
+  const task = document.getElementById('auctionTaskInput').value.trim();
+  if (!task) return;
+  auctionState.task = task;
+
+  document.getElementById('auctionBidsList').innerHTML =
+    '<div style="text-align:center;color:rgba(0,0,0,0.4);padding:20px;font-size:11px;">Workers are bidding…</div>';
+
+  fetch('/api/bidding/bids', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task }),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) throw new Error(data.error);
+      auctionState.bids = data.bids;
+      renderBids(data.bids);
+      document.getElementById('auctionAward').style.display = 'inline-block';
+
+      // Spawn floating bid sprites above workers in the 3D world
+      data.bids.forEach((b, idx) => {
+        spawnBidLabel(b.worker, b.bid, idx === 0);
+      });
+    })
+    .catch(err => {
+      document.getElementById('auctionBidsList').innerHTML =
+        `<div style="color:#ff4d6d;padding:10px;font-size:11px;">エラー: ${escapeHtml(err.message)}</div>`;
+    });
+}
+
+function renderBids(bids) {
+  const list = document.getElementById('auctionBidsList');
+  list.innerHTML = bids.map((b, idx) => {
+    const wType = WORKER_TYPES[b.worker];
+    const isWinner = idx === 0;
+    return `<div class="bid-row ${isWinner ? 'winner' : ''}">
+      <div class="bid-rank">#${idx + 1}</div>
+      <div class="bid-emoji">${wType.emoji}</div>
+      <div class="bid-name">${wType.label}</div>
+      <div class="bid-amount">${Math.round(b.bid)} OZC</div>
+    </div>`;
+  }).join('');
+}
+
+function awardAuction() {
+  const task = auctionState.task;
+  if (!task) return;
+  fetch('/api/bidding/auction', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ task }),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (!data.ok) {
+        showNotification(`Auction failed: ${data.error}`);
+        return;
+      }
+      const wType = WORKER_TYPES[data.winner];
+      showNotification(`${wType.emoji} ${wType.label} won the auction (${Math.round(data.winning_bid)} OZC)`);
+      ozSpeak(`${wType.label}が${Math.round(data.winning_bid)}オーゼットコインで落札しました`, 'Kyoko', 200, 'hitomi');
+      // Trigger the worker to actually start working
+      const worker = workers.find(w => w.type === data.winner);
+      if (worker) {
+        worker.task = task;
+        if (worker.state !== 'coding') assignWork(worker);
+      }
+      closeAuction();
+    });
+}
+
+// Floating bid sprites that appear above workers during an auction
+const bidLabels = [];
+
+function spawnBidLabel(workerType, bid, isWinner) {
+  const worker = workers.find(w => w.type === workerType);
+  if (!worker) return;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 160; canvas.height = 50;
+  const ctx = canvas.getContext('2d');
+  // Background
+  ctx.fillStyle = isWinner ? 'rgba(255, 209, 102, 0.95)' : 'rgba(255, 255, 255, 0.92)';
+  ctx.strokeStyle = isWinner ? '#ff8a5c' : '#b8860b';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(4, 4, 152, 42, 12);
+  else ctx.rect(4, 4, 152, 42);
+  ctx.fill();
+  ctx.stroke();
+  // "BID" label
+  ctx.fillStyle = isWinner ? '#fff' : 'rgba(0,0,0,0.4)';
+  ctx.font = 'bold 9px Inter, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(isWinner ? 'WINNER' : 'BID', 80, 16);
+  // Amount
+  ctx.fillStyle = isWinner ? '#fff' : '#b8860b';
+  ctx.font = 'bold 18px Inter, sans-serif';
+  ctx.fillText(`${Math.round(bid)} OZC`, 80, 38);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, opacity: 0,
+  }));
+  sprite.scale.set(2.0, 0.6, 1);
+  sprite.position.set(
+    worker.group.position.x,
+    worker.group.position.y + 5,
+    worker.group.position.z,
+  );
+  scene.add(sprite);
+  bidLabels.push({
+    sprite,
+    worker,
+    bornAt: performance.now(),
+    lifetime: 6000,
+  });
+}
+
+function updateBidLabels() {
+  const now = performance.now();
+  for (let i = bidLabels.length - 1; i >= 0; i--) {
+    const b = bidLabels[i];
+    const age = now - b.bornAt;
+    if (age > b.lifetime) {
+      scene.remove(b.sprite);
+      bidLabels.splice(i, 1);
+      continue;
+    }
+    // Fade in / hold / fade out
+    let opacity;
+    if (age < 300) opacity = age / 300;
+    else if (age > b.lifetime - 800) opacity = (b.lifetime - age) / 800;
+    else opacity = 1;
+    b.sprite.material.opacity = opacity * 0.95;
+    // Float upward and follow worker
+    const floatOffset = Math.min(1.5, age / 1500) * 1.5;
+    b.sprite.position.set(
+      b.worker.group.position.x,
+      b.worker.group.position.y + 5 + floatOffset,
+      b.worker.group.position.z,
+    );
+  }
+}
+
+// ============================
+// Topup — buy OZC for hitomi
+// ============================
+function topupHitomi(amount) {
+  fetch('/api/economy/topup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      agent: 'hitomi',
+      amount,
+      source: 'human-purchase',
+    }),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        showNotification(`+${amount} OZC topped up to hitomi`);
+        // Spawn a coin animation from "treasury" (above) into hitomi tower
+        const fromPos = new THREE.Vector3(0, 30, 0);
+        const toPos = getAgentWorldPos('hitomi');
+        if (toPos) spawnFlyingCoin(fromPos, toPos, amount);
+      } else {
+        showNotification(`Topup failed: ${data.error}`);
+      }
+    });
+}
+
+document.querySelectorAll('.topup-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const amount = parseFloat(btn.dataset.amount);
+    topupHitomi(amount);
+  });
+});
+
+// Auto-topup: when any non-treasury, non-human agent's balance drops below 50,
+// hitomi gives them 100 OZC. When hitomi itself drops below 500, treasury mints
+// 1000 OZC into her account (only if auto-topup is enabled).
+let lastAutoTopup = 0;
+function checkAutoTopup() {
+  const enabled = document.getElementById('autoTopupCheck').checked;
+  if (!enabled) return;
+  if (Date.now() - lastAutoTopup < 8000) return; // throttle
+  lastAutoTopup = Date.now();
+
+  const balances = economyState.balances;
+  // hitomi low → mint
+  if ((balances.hitomi || 0) < 500) {
+    topupHitomi(1000);
+    return;
+  }
+  // workers low → hitomi pays them
+  for (const [agent, bal] of Object.entries(balances)) {
+    if (['hitomi', 'treasury', 'human'].includes(agent)) continue;
+    if (bal < 50) {
+      fetch('/api/economy/transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          from_agent: 'hitomi',
+          to_agent: agent,
+          amount: 100,
+          action: 'auto.topup',
+          detail: 'low balance refill',
+        }),
+      });
+      showNotification(`Auto-topup: hitomi → ${agent} 100 OZC`);
+      return;
+    }
+  }
+}
+
+setInterval(checkAutoTopup, 4000);
+
+
+document.getElementById('ctrlTask').addEventListener('click', openAuction);
+document.getElementById('auctionClose').addEventListener('click', closeAuction);
+document.getElementById('auctionRun').addEventListener('click', fetchBids);
+document.getElementById('auctionAward').addEventListener('click', awardAuction);
+document.getElementById('auctionTaskInput').addEventListener('keydown', (e) => {
+  e.stopPropagation();
+  if (e.key === 'Enter') fetchBids();
+  if (e.key === 'Escape') closeAuction();
+});
+document.getElementById('auctionTaskInput').addEventListener('keyup', (e) => e.stopPropagation());
 
 
 // Periodic mail sending (hitomi assigning tasks)
@@ -2404,6 +2862,58 @@ function showDialog(worker) {
   const dx = joeState.x - worker.group.position.x;
   const dz = joeState.z - worker.group.position.z;
   worker.group.rotation.y = Math.atan2(dx, dz);
+
+  // Setup the freeform Claude ask input
+  const askInput = document.getElementById('dialogAskInput');
+  askInput.value = '';
+  askInput.disabled = false;
+  askInput.placeholder = `${wType.label}に話しかける… (Enterで送信、5 OZC消費)`;
+
+  // Replace the existing handler each time we open dialog
+  askInput.onkeydown = (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') {
+      const msg = askInput.value.trim();
+      if (msg) askWorkerLive(worker, msg, askInput);
+    }
+  };
+  askInput.onkeyup = (e) => e.stopPropagation();
+}
+
+// Send a freeform question to a worker, route through /api/agents/ask
+function askWorkerLive(worker, message, inputEl) {
+  const textEl = document.getElementById('dialogText');
+  const wType = WORKER_TYPES[worker.type];
+  const originalText = textEl.textContent;
+
+  // Show "thinking" state
+  textEl.innerHTML = `<span style="opacity:0.5;">${wType.label}が考えています…</span>`;
+  inputEl.disabled = true;
+  inputEl.value = '';
+
+  fetch('/api/agents/ask', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ agent: worker.type, message }),
+  })
+    .then(r => r.json().then(data => ({ status: r.status, data })))
+    .then(({ status, data }) => {
+      if (data.ok) {
+        textEl.textContent = data.reply;
+        // Worker speaks the response (TTS handled server-side via charge)
+        ozSpeak(data.reply, 'Kyoko', 200, worker.type);
+      } else if (data.reason === 'insufficient_funds') {
+        textEl.innerHTML = `<span style="color:#ff4d6d;">${wType.label}は予算が足りません (残高: ${Math.round(data.balance)} OZC)</span>`;
+      } else {
+        textEl.innerHTML = `<span style="color:#ff4d6d;">エラー: ${escapeHtml(data.error || 'unknown')}</span>`;
+      }
+      inputEl.disabled = false;
+      inputEl.focus();
+    })
+    .catch(err => {
+      textEl.innerHTML = `<span style="color:#ff4d6d;">通信エラー</span>`;
+      inputEl.disabled = false;
+    });
 }
 
 function updateDialogContent(worker, page) {
@@ -2861,6 +3371,8 @@ const keys = {};
 window.addEventListener('keydown', (e) => {
   // Skip game keys when voice panel is open (except T and Escape)
   if (voiceController && voiceController.panelOpen && e.key !== 'Escape' && e.key !== 't' && e.key !== 'T') return;
+  // Skip game keys when the dialog Claude input is focused
+  if (document.activeElement && document.activeElement.id === 'dialogAskInput') return;
   keys[e.key.toLowerCase()] = true;
 
   if (e.key === ' ') {
@@ -2897,6 +3409,13 @@ window.addEventListener('keydown', (e) => {
     } else if (cameraMode === 'firstPerson') {
       switchToOrbital();
     }
+  }
+
+  // B key — open task auction
+  if ((e.key === 'b' || e.key === 'B') && !e.repeat) {
+    e.preventDefault();
+    openAuction();
+    return;
   }
 
   // T key — voice command (record toggle)
@@ -3258,6 +3777,7 @@ function animate() {
   // --- OZ Economy: coin animations + balance label positions ---
   updateFlyingCoins(t);
   updateWorkerBalanceLabels();
+  updateBidLabels();
 
   // --- Voice navigator camera tween ---
   voiceNavigator.update();

@@ -17,6 +17,7 @@ API は oz_webserver.py 経由で公開する想定。
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sqlite3
@@ -110,12 +111,20 @@ def init_db():
                 action TEXT NOT NULL,
                 detail TEXT,
                 from_balance_after REAL,
-                to_balance_after REAL
+                to_balance_after REAL,
+                prev_hash TEXT,
+                hash TEXT
             )
         """)
         cur.execute("""
             CREATE INDEX IF NOT EXISTS idx_ledger_ts ON ledger(ts DESC)
         """)
+        # Add hash columns if upgrading from older schema
+        for col in ("prev_hash", "hash"):
+            try:
+                cur.execute(f"ALTER TABLE ledger ADD COLUMN {col} TEXT")
+            except sqlite3.OperationalError:
+                pass
 
         # Seed initial balances if table is empty
         cur.execute("SELECT COUNT(*) FROM balances")
@@ -126,6 +135,80 @@ def init_db():
                     (agent, balance),
                 )
         conn.close()
+
+
+# ================================
+# Block hashing — tamper-proof ledger
+# ================================
+GENESIS_HASH = "0" * 64
+
+
+def _compute_block_hash(tx: dict) -> str:
+    """Hash a transaction record together with the previous block's hash."""
+    payload = json.dumps(
+        {
+            "id": tx["id"],
+            "ts": round(tx["ts"], 6),
+            "from": tx["from_agent"],
+            "to": tx["to_agent"],
+            "amount": tx["amount"],
+            "action": tx["action"],
+            "detail": tx["detail"] or "",
+            "prev": tx["prev_hash"],
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _get_last_hash(cur) -> str:
+    cur.execute("SELECT hash FROM ledger WHERE hash IS NOT NULL ORDER BY id DESC LIMIT 1")
+    row = cur.fetchone()
+    return row[0] if row and row[0] else GENESIS_HASH
+
+
+def verify_chain() -> dict:
+    """
+    Walk the entire ledger and verify every block's hash matches its content
+    and links correctly to the previous block.
+
+    Returns:
+        {ok: bool, total: int, valid: int, broken_at: int|null}
+    """
+    with _lock:
+        conn = _conn()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT id, ts, from_agent, to_agent, amount, action, detail, prev_hash, hash "
+            "FROM ledger ORDER BY id ASC"
+        )
+        rows = cur.fetchall()
+        conn.close()
+
+    expected_prev = GENESIS_HASH
+    total = 0
+    for row in rows:
+        total += 1
+        tx = {
+            "id": row[0],
+            "ts": row[1],
+            "from_agent": row[2],
+            "to_agent": row[3],
+            "amount": row[4],
+            "action": row[5],
+            "detail": row[6],
+            "prev_hash": row[7],
+            "hash": row[8],
+        }
+        if tx["prev_hash"] != expected_prev:
+            return {"ok": False, "total": total, "valid": total - 1, "broken_at": tx["id"], "reason": "prev_hash mismatch"}
+        expected_hash = _compute_block_hash(tx)
+        if tx["hash"] != expected_hash:
+            return {"ok": False, "total": total, "valid": total - 1, "broken_at": tx["id"], "reason": "hash mismatch"}
+        expected_prev = tx["hash"]
+
+    return {"ok": True, "total": total, "valid": total, "broken_at": None}
 
 
 # ================================
@@ -222,15 +305,30 @@ def transfer(
         cur.execute("SELECT balance FROM balances WHERE agent = ?", (to_agent,))
         to_after = float(cur.fetchone()[0])
 
-        # Insert ledger row
+        # Insert ledger row with chained hash
         ts = time.time()
+        prev_hash = _get_last_hash(cur)
         cur.execute(
             """INSERT INTO ledger
-               (ts, from_agent, to_agent, amount, action, detail, from_balance_after, to_balance_after)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (ts, from_agent, to_agent, amount, action, detail, from_after, to_after),
+               (ts, from_agent, to_agent, amount, action, detail, from_balance_after, to_balance_after, prev_hash, hash)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (ts, from_agent, to_agent, amount, action, detail, from_after, to_after, prev_hash, ""),
         )
         tx_id = cur.lastrowid
+
+        # Now compute the hash for this row using its assigned id
+        tx_for_hash = {
+            "id": tx_id,
+            "ts": ts,
+            "from_agent": from_agent,
+            "to_agent": to_agent,
+            "amount": amount,
+            "action": action,
+            "detail": detail,
+            "prev_hash": prev_hash,
+        }
+        block_hash = _compute_block_hash(tx_for_hash)
+        cur.execute("UPDATE ledger SET hash = ? WHERE id = ?", (block_hash, tx_id))
         conn.close()
 
         return {
@@ -243,6 +341,8 @@ def transfer(
             "detail": detail,
             "from_balance_after": from_after,
             "to_balance_after": to_after,
+            "prev_hash": prev_hash,
+            "hash": block_hash,
         }
 
 
@@ -281,13 +381,13 @@ def get_ledger(limit: int = 50, since_ts: Optional[float] = None) -> list:
         cur = conn.cursor()
         if since_ts is not None:
             cur.execute(
-                "SELECT id, ts, from_agent, to_agent, amount, action, detail, from_balance_after, to_balance_after "
+                "SELECT id, ts, from_agent, to_agent, amount, action, detail, from_balance_after, to_balance_after, prev_hash, hash "
                 "FROM ledger WHERE ts > ? ORDER BY ts DESC LIMIT ?",
                 (since_ts, limit),
             )
         else:
             cur.execute(
-                "SELECT id, ts, from_agent, to_agent, amount, action, detail, from_balance_after, to_balance_after "
+                "SELECT id, ts, from_agent, to_agent, amount, action, detail, from_balance_after, to_balance_after, prev_hash, hash "
                 "FROM ledger ORDER BY ts DESC LIMIT ?",
                 (limit,),
             )
@@ -305,6 +405,8 @@ def get_ledger(limit: int = 50, since_ts: Optional[float] = None) -> list:
                 "detail": r[6],
                 "from_balance_after": r[7],
                 "to_balance_after": r[8],
+                "prev_hash": r[9],
+                "hash": r[10],
             }
             for r in rows
         ]
@@ -328,6 +430,18 @@ def get_daily_stats() -> dict:
             "daily_cap": DAILY_BUDGET_CAP,
             "remaining": float(DAILY_BUDGET_CAP - spent),
         }
+
+
+def topup(agent: str, amount: float, source: str = "human") -> dict:
+    """
+    Mint new OZC and credit it to an agent. Used when the human user
+    "buys" OZC for themselves or for hitomi.
+
+    Funds flow from `treasury` (the system's mint) to the target agent.
+    """
+    if amount <= 0:
+        raise ValueError("amount must be positive")
+    return transfer("treasury", agent, amount, "topup", source)
 
 
 def reset_daily_balances():
@@ -365,6 +479,7 @@ def main():
     sub.add_parser("ledger", help="Show recent transactions")
     sub.add_parser("stats", help="Show today's spending stats")
     sub.add_parser("reset", help="Reset balances to initial state")
+    sub.add_parser("verify", help="Verify the entire ledger chain")
 
     transfer_p = sub.add_parser("transfer", help="Transfer OZC")
     transfer_p.add_argument("from_agent")
@@ -399,6 +514,9 @@ def main():
     elif args.cmd == "reset":
         reset_daily_balances()
         print("Reset complete")
+    elif args.cmd == "verify":
+        result = verify_chain()
+        print(json.dumps(result, indent=2))
     elif args.cmd == "transfer":
         tx = transfer(args.from_agent, args.to_agent, args.amount, args.action, args.detail)
         print(json.dumps(tx, indent=2, ensure_ascii=False))
