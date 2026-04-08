@@ -415,6 +415,87 @@
   }
   #voiceTextInput input:focus { border-color: #118ab2; }
 
+  /* === Approvals Panel === */
+  #approvalsPanel {
+    position: fixed;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 250;
+    display: none;
+    max-width: 540px;
+    width: 90%;
+  }
+  #approvalsPanel.show { display: block; }
+  .approval-card {
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(16px);
+    border: 2px solid #ffa040;
+    border-radius: 14px;
+    padding: 14px 18px;
+    margin-bottom: 8px;
+    box-shadow: 0 8px 28px rgba(255, 160, 64, 0.2);
+    animation: approvalIn 0.3s ease-out;
+  }
+  @keyframes approvalIn {
+    from { transform: translateY(-10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  .approval-card .approval-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #c2410c;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .approval-card .approval-title::before { content: "🔐"; }
+  .approval-card .approval-body {
+    font-size: 13px;
+    color: #333;
+    margin-bottom: 10px;
+    line-height: 1.5;
+  }
+  .approval-card .approval-body code {
+    background: rgba(0,0,0,0.06);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: monospace;
+  }
+  .approval-card .approval-detail {
+    font-size: 11px;
+    color: rgba(0,0,0,0.5);
+    margin-top: 4px;
+    word-break: break-word;
+  }
+  .approval-card .approval-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  .approval-card button {
+    padding: 6px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s;
+  }
+  .approval-card button:hover { transform: translateY(-1px); }
+  .approval-card .btn-approve {
+    background: linear-gradient(135deg, #06d6a0, #1b9aaa);
+    color: #fff;
+  }
+  .approval-card .btn-deny {
+    background: rgba(0,0,0,0.06);
+    color: #555;
+  }
+
   /* === OZ Economy === */
   #economyPanel {
     position: fixed;
@@ -1046,6 +1127,9 @@
 
 <!-- Voice Transcript Overlay -->
 <div id="voiceTranscript"><span class="transcript-prefix">🎤</span><span id="transcriptText"></span></div>
+
+<!-- Approvals Panel — appears at top center when actions need user consent -->
+<div id="approvalsPanel"></div>
 
 <!-- OZ Economy Panel -->
 <div id="economyPanel">
@@ -2842,6 +2926,56 @@ document.getElementById('storeClose').addEventListener('click', closeStore);
 document.querySelectorAll('.store-pkg').forEach(el => {
   el.addEventListener('click', () => purchasePackage(el.dataset.package));
 });
+
+
+// ============================
+// Approvals — pending capability requests from oz_runtime
+// ============================
+function fetchApprovals() {
+  fetch('/api/approvals')
+    .then(r => r.json())
+    .then(data => {
+      const panel = document.getElementById('approvalsPanel');
+      const pending = (data && data.pending) || [];
+      if (pending.length === 0) {
+        panel.classList.remove('show');
+        panel.innerHTML = '';
+        return;
+      }
+      panel.classList.add('show');
+      panel.innerHTML = pending.map(req => {
+        const agent = escapeHtml(String(req.agent || ''));
+        const action = escapeHtml(String(req.action || ''));
+        const detail = escapeHtml(String(req.detail || ''));
+        const reqId = escapeHtml(String(req.id || ''));
+        return `<div class="approval-card">
+          <div class="approval-title">承認が必要です</div>
+          <div class="approval-body">
+            <b>${agent}</b> が <code>${action}</code> を実行しようとしています。
+            <div class="approval-detail">${detail}</div>
+          </div>
+          <div class="approval-actions">
+            <button class="btn-deny" data-id="${reqId}" data-decision="deny">拒否</button>
+            <button class="btn-approve" data-id="${reqId}" data-decision="approve">承認</button>
+          </div>
+        </div>`;
+      }).join('');
+      panel.querySelectorAll('button[data-id]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.id;
+          const decision = btn.dataset.decision;
+          fetch('/api/approvals/resolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id, decision }),
+          }).then(() => fetchApprovals());
+        });
+      });
+    })
+    .catch(() => {});
+}
+setInterval(fetchApprovals, 1000);
+fetchApprovals();
 
 
 // Verify the chain integrity periodically (every 6s)

@@ -25,6 +25,7 @@ import oz_economy
 import oz_agents
 import oz_bidding
 import oz_external
+import oz_runtime
 
 PORT = 8767
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
@@ -211,6 +212,17 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(html)
             return
 
+        # === Capabilities & approvals (read-only views) ===
+        if self.path == "/api/capabilities":
+            result = oz_runtime.call_runtime("caps.list", {})
+            self._send_json(result)
+            return
+
+        if self.path == "/api/approvals":
+            result = oz_runtime.call_runtime("approvals.list", {})
+            self._send_json(result)
+            return
+
         if self.path == "/api/external/providers":
             providers = []
             for name, info in oz_external.EXTERNAL_PROVIDERS.items():
@@ -248,34 +260,39 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         if self.path == "/api/speak":
+            # Delegate to oz_runtime which enforces capability + approval gates
             body = self._read_body()
             if body is None:
                 return
             try:
                 data = json.loads(body)
-                text = (data.get("text") or "")[:500]  # cap length
-                voice = data.get("voice") or "Kyoko"
-                if voice not in ALLOWED_VOICES:
-                    voice = "Kyoko"
-                try:
-                    rate = int(data.get("rate", 200))
-                except (TypeError, ValueError):
-                    rate = 200
-                rate = max(RATE_MIN, min(RATE_MAX, rate))
-                agent = data.get("agent", "hitomi")
-                if text:
-                    subprocess.Popen(
-                        ["say", "-v", voice, "-r", str(rate), "--", text],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                    )
-                    try:
-                        oz_economy.charge_action(agent, "tts.speak", text[:60])
-                    except Exception:
-                        pass
-                self._send_json({"ok": True})
+                result = oz_runtime.call_runtime("speak", {
+                    "text": data.get("text"),
+                    "voice": data.get("voice"),
+                    "rate": data.get("rate"),
+                    "agent": data.get("agent", "hitomi"),
+                })
+                self._send_json(result)
             except Exception as e:
-                self._send_json({"ok": False, "error": "internal error"}, status=500)
                 print(f"  /api/speak error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
+            return
+
+        # === Approvals: user resolves a pending request ===
+        if self.path == "/api/approvals/resolve":
+            body = self._read_body()
+            if body is None:
+                return
+            try:
+                data = json.loads(body)
+                result = oz_runtime.call_runtime("approvals.resolve", {
+                    "id": data.get("id"),
+                    "decision": data.get("decision"),
+                })
+                self._send_json(result)
+            except Exception as e:
+                print(f"  /api/approvals/resolve error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
             return
 
         # === OZ Economy POST endpoints ===
@@ -416,28 +433,14 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
                 return
             try:
                 data = json.loads(body)
-                provider = data.get("provider")
-                prompt = (data.get("prompt") or "")[:MAX_USER_MESSAGE]
-                if not provider or not prompt:
-                    self._send_json({"ok": False, "error": "provider and prompt required"}, status=400)
-                    return
-                if provider not in oz_external.EXTERNAL_PROVIDERS:
-                    self._send_json({"ok": False, "error": "unknown provider"}, status=400)
-                    return
-                result = oz_external.call_external(provider, prompt)
-                # Charge hitomi for the call (real cost in OZC)
-                if result.get("ok"):
-                    cost_ozc = oz_external.jpy_to_ozc(result["real_cost_jpy"])
-                    try:
-                        oz_economy.transfer(
-                            "hitomi", "treasury", cost_ozc,
-                            f"external.{provider}", prompt[:60],
-                        )
-                    except Exception:
-                        pass
+                result = oz_runtime.call_runtime("external.call", {
+                    "provider": data.get("provider"),
+                    "prompt": data.get("prompt"),
+                })
                 self._send_json(result)
             except Exception as e:
-                self._send_json({"ok": False, "error": str(e)}, status=500)
+                print(f"  /api/external/call error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
             return
 
         # === Bidding — agents bid on tasks ===
@@ -473,22 +476,17 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"ok": False, "error": "internal error"}, status=500)
             return
 
-        # === Agents — workers actually call Claude ===
+        # === Agents — workers actually call Claude (delegated to runtime) ===
         if self.path == "/api/agents/ask":
             body = self._read_body()
             if body is None:
                 return
             try:
                 data = json.loads(body)
-                agent = str(data.get("agent", "hitomi"))[:64]
-                message = (data.get("message") or "")[:MAX_USER_MESSAGE]
-                if not message:
-                    self._send_json({"ok": False, "error": "message required"}, status=400)
-                    return
-                if agent not in oz_agents.WORKER_PERSONALITIES:
-                    self._send_json({"ok": False, "error": "unknown agent"}, status=400)
-                    return
-                result = oz_agents.ask_agent(agent, message, timeout=45)
+                result = oz_runtime.call_runtime("agent.ask", {
+                    "agent": data.get("agent", "hitomi"),
+                    "message": data.get("message", ""),
+                }, timeout=120.0)
                 status = 200 if result.get("ok") else 402
                 self._send_json(result, status=status)
             except Exception as e:
