@@ -37,6 +37,7 @@ from typing import Optional
 import oz_economy
 import oz_capabilities
 import oz_approvals
+import oz_macos
 from oz_capabilities import Permission
 
 SOCKET_PATH = os.path.expanduser("~/.openclaw/oz_runtime.sock")
@@ -179,6 +180,82 @@ def _handle_external_call(params: dict) -> dict:
     return result
 
 
+def _handle_macos_list(params: dict) -> dict:
+    """Read-only: list installed apps. No gate (always-allowed)."""
+    agent = str(params.get("agent", "hitomi"))[:64]
+    gate = _gate(agent, "macos.app.list", "list installed apps")
+    if gate is not None:
+        return gate
+    return {"ok": True, "apps": oz_macos.list_installed_apps()}
+
+
+def _handle_macos_running(params: dict) -> dict:
+    agent = str(params.get("agent", "hitomi"))[:64]
+    gate = _gate(agent, "macos.app.running", "list running apps")
+    if gate is not None:
+        return gate
+    return {"ok": True, "apps": oz_macos.list_running_apps()}
+
+
+def _handle_macos_active(params: dict) -> dict:
+    agent = str(params.get("agent", "hitomi"))[:64]
+    gate = _gate(agent, "macos.window.active", "read active window")
+    if gate is not None:
+        return gate
+    return {
+        "ok": True,
+        "app": oz_macos.get_active_app(),
+        "window": oz_macos.get_active_window_title(),
+    }
+
+
+def _handle_macos_launch(params: dict) -> dict:
+    """Launch a macOS app. Requires user approval."""
+    agent = str(params.get("agent", "hitomi"))[:64]
+    app_name = str(params.get("app", ""))[:64]
+    if not app_name:
+        return {"ok": False, "error": "app name required"}
+
+    gate = _gate(agent, "macos.app.launch", f"launch '{app_name}'")
+    if gate is not None:
+        return gate
+
+    result = oz_macos.launch_app(app_name)
+    # Charge a small fee on success
+    if result.get("ok"):
+        try:
+            oz_economy.charge_action(agent, "app.launch", app_name)
+        except Exception:
+            pass
+    return result
+
+
+def _handle_macos_focus(params: dict) -> dict:
+    agent = str(params.get("agent", "hitomi"))[:64]
+    app_name = str(params.get("app", ""))[:64]
+    if not app_name:
+        return {"ok": False, "error": "app name required"}
+
+    gate = _gate(agent, "macos.app.focus", f"focus '{app_name}'")
+    if gate is not None:
+        return gate
+
+    return oz_macos.focus_app(app_name)
+
+
+def _handle_macos_quit(params: dict) -> dict:
+    agent = str(params.get("agent", "hitomi"))[:64]
+    app_name = str(params.get("app", ""))[:64]
+    if not app_name:
+        return {"ok": False, "error": "app name required"}
+
+    gate = _gate(agent, "macos.app.quit", f"quit '{app_name}'")
+    if gate is not None:
+        return gate
+
+    return oz_macos.quit_app(app_name)
+
+
 def _handle_caps_list(params: dict) -> dict:
     return {
         "ok": True,
@@ -210,6 +287,13 @@ HANDLERS = {
     "caps.list":       _handle_caps_list,
     "approvals.list":  _handle_approvals_list,
     "approvals.resolve": _handle_approvals_resolve,
+    # macOS bridge
+    "macos.list":      _handle_macos_list,
+    "macos.running":   _handle_macos_running,
+    "macos.active":    _handle_macos_active,
+    "macos.launch":    _handle_macos_launch,
+    "macos.focus":     _handle_macos_focus,
+    "macos.quit":      _handle_macos_quit,
 }
 
 

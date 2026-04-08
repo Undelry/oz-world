@@ -212,6 +212,17 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(html)
             return
 
+        # === macOS bridge (read-only GETs) ===
+        if self.path == "/api/macos/installed":
+            self._send_json(oz_runtime.call_runtime("macos.list", {}))
+            return
+        if self.path == "/api/macos/running":
+            self._send_json(oz_runtime.call_runtime("macos.running", {}))
+            return
+        if self.path == "/api/macos/active":
+            self._send_json(oz_runtime.call_runtime("macos.active", {}))
+            return
+
         # === Capabilities & approvals (read-only views) ===
         if self.path == "/api/capabilities":
             result = oz_runtime.call_runtime("caps.list", {})
@@ -275,6 +286,55 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json(result)
             except Exception as e:
                 print(f"  /api/speak error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
+            return
+
+        # === macOS bridge (mutating POSTs go through runtime gate) ===
+        if self.path == "/api/macos/launch":
+            body = self._read_body()
+            if body is None:
+                return
+            try:
+                data = json.loads(body)
+                result = oz_runtime.call_runtime("macos.launch", {
+                    "agent": data.get("agent", "hitomi"),
+                    "app": data.get("app"),
+                }, timeout=120.0)  # long enough for the user to approve
+                self._send_json(result)
+            except Exception as e:
+                print(f"  /api/macos/launch error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
+            return
+
+        if self.path == "/api/macos/focus":
+            body = self._read_body()
+            if body is None:
+                return
+            try:
+                data = json.loads(body)
+                result = oz_runtime.call_runtime("macos.focus", {
+                    "agent": data.get("agent", "hitomi"),
+                    "app": data.get("app"),
+                })
+                self._send_json(result)
+            except Exception as e:
+                print(f"  /api/macos/focus error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
+            return
+
+        if self.path == "/api/macos/quit":
+            body = self._read_body()
+            if body is None:
+                return
+            try:
+                data = json.loads(body)
+                result = oz_runtime.call_runtime("macos.quit", {
+                    "agent": data.get("agent", "hitomi"),
+                    "app": data.get("app"),
+                }, timeout=120.0)
+                self._send_json(result)
+            except Exception as e:
+                print(f"  /api/macos/quit error: {e}")
                 self._send_json({"ok": False, "error": "internal error"}, status=500)
             return
 

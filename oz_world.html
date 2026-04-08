@@ -1,6 +1,23 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+<script>
+  // Early error capture so we can see ESM module errors via JS query
+  window.__ozErrors = [];
+  window.addEventListener('error', e => {
+    window.__ozErrors.push({
+      message: e.message, filename: e.filename,
+      lineno: e.lineno, colno: e.colno,
+      stack: e.error?.stack,
+    });
+  });
+  window.addEventListener('unhandledrejection', e => {
+    window.__ozErrors.push({
+      message: 'unhandled: ' + (e.reason?.message || String(e.reason)),
+      stack: e.reason?.stack,
+    });
+  });
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OZ — Virtual World</title>
@@ -2522,6 +2539,109 @@ function updateFlyingCoins(t) {
   }
 }
 
+// ============================
+// macOS app launch visual effect
+// ============================
+// When the user says "open Mail", we spawn a glowing 3D card with the app's
+// name flying in from outside the world toward the hitomi tower.
+const flyingApps = [];
+
+function spawnAppLaunchEffect(appName) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+
+  // Glow background
+  const grad = ctx.createRadialGradient(128, 128, 16, 128, 128, 120);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.4, 'rgba(255,209,102,0.8)');
+  grad.addColorStop(1, 'rgba(255,209,102,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 256, 256);
+
+  // Card body
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx.strokeStyle = '#118ab2';
+  ctx.lineWidth = 4;
+  if (ctx.roundRect) ctx.roundRect(40, 70, 176, 116, 20);
+  else ctx.rect(40, 70, 176, 116);
+  ctx.fill();
+  ctx.stroke();
+
+  // App icon placeholder
+  ctx.fillStyle = '#118ab2';
+  if (ctx.roundRect) ctx.roundRect(64, 90, 48, 48, 10);
+  else ctx.rect(64, 90, 48, 48);
+  ctx.fill();
+
+  // App name
+  ctx.fillStyle = '#333';
+  ctx.font = 'bold 18px Inter, sans-serif';
+  ctx.textAlign = 'left';
+  const truncated = appName.length > 12 ? appName.slice(0, 11) + '…' : appName;
+  ctx.fillText(truncated, 124, 122);
+
+  // "Launching…" subtitle
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.font = '11px Inter, sans-serif';
+  ctx.fillText('LAUNCHING', 124, 144);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, opacity: 0,
+  }));
+  sprite.scale.set(4, 4, 1);
+
+  // Spawn from a random direction outside the world
+  const angle = Math.random() * Math.PI * 2;
+  const fromPos = new THREE.Vector3(
+    Math.cos(angle) * 55,
+    20 + Math.random() * 10,
+    Math.sin(angle) * 55,
+  );
+  sprite.position.copy(fromPos);
+  scene.add(sprite);
+
+  const toPos = new THREE.Vector3(
+    hitomiTowerGroup.position.x,
+    hitomiTowerGroup.position.y + 8,
+    hitomiTowerGroup.position.z,
+  );
+
+  flyingApps.push({
+    sprite, fromPos, toPos,
+    progress: 0,
+    speed: 0.012,
+    lifetime: 4500,
+    bornAt: performance.now(),
+  });
+}
+
+function updateFlyingApps(t) {
+  const now = performance.now();
+  for (let i = flyingApps.length - 1; i >= 0; i--) {
+    const f = flyingApps[i];
+    const age = now - f.bornAt;
+
+    f.progress = Math.min(1, age / 1500);
+    const eased = 1 - Math.pow(1 - f.progress, 3);
+    f.sprite.position.lerpVectors(f.fromPos, f.toPos, eased);
+
+    let opacity;
+    if (age < 250) opacity = age / 250;
+    else if (age > f.lifetime - 600) opacity = Math.max(0, (f.lifetime - age) / 600);
+    else opacity = 1;
+    f.sprite.material.opacity = opacity;
+    f.sprite.material.rotation = age * 0.001;
+
+    if (age > f.lifetime) {
+      scene.remove(f.sprite);
+      flyingApps.splice(i, 1);
+    }
+  }
+}
+
+
 // Worker balance label sprites (created lazily)
 const workerBalanceLabels = {};
 
@@ -4334,6 +4454,7 @@ function animate() {
   updateWorkerBalanceLabels();
   updateBidLabels();
   updateExternalAvatars(t);
+  updateFlyingApps(t);
 
   // --- Voice navigator camera tween ---
   voiceNavigator.update();
@@ -4559,6 +4680,36 @@ class VoiceCommandParser {
       { re: /(?:release|free)\s+(.+)/i, group: 1 },
     ];
 
+    // macOS app launch patterns: "メール開いて" / "VS Code起動" / "open Safari"
+    this.appLaunchPatterns = [
+      { re: /(.+?)(?:を)?(?:開いて|起動して|立ち上げて)/, group: 1 },
+      { re: /(?:open|launch|start)\s+(.+)/i, group: 1 },
+    ];
+
+    // Friendly aliases — what the user *says* → real .app bundle name
+    this.appAliases = {
+      'メール': 'Mail', 'mail': 'Mail',
+      'メッセージ': 'Messages', 'imessage': 'Messages', 'messages': 'Messages',
+      'カレンダー': 'Calendar', 'calendar': 'Calendar',
+      'サファリ': 'Safari', 'safari': 'Safari',
+      'アーク': 'Arc', 'arc': 'Arc',
+      'クローム': 'Google Chrome', 'chrome': 'Google Chrome',
+      'メモ': 'Notes', 'notes': 'Notes',
+      'リマインダー': 'Reminders', 'reminders': 'Reminders',
+      'ファインダー': 'Finder', 'finder': 'Finder',
+      'ターミナル': 'Terminal', 'terminal': 'Terminal',
+      'vs code': 'Visual Studio Code', 'vscode': 'Visual Studio Code',
+      'スポティファイ': 'Spotify', 'spotify': 'Spotify',
+      'スラック': 'Slack', 'slack': 'Slack',
+      'discord': 'Discord', 'ディスコード': 'Discord',
+      'line': 'LINE', 'ライン': 'LINE',
+      '電卓': 'Calculator', 'calculator': 'Calculator',
+      '時計': 'Clock', 'clock': 'Clock',
+      'マップ': 'Maps', 'maps': 'Maps',
+      'ミュージック': 'Music', 'music': 'Music',
+      '写真': 'Photos', 'photos': 'Photos',
+    };
+
     // Camera patterns
     this.cameraPatterns = [
       { re: /一人称|ファーストパーソン|first\s*person/i, action: 'firstPerson' },
@@ -4575,6 +4726,20 @@ class VoiceCommandParser {
       { re: /(?:じゃあね|バイバイ|さよなら|閉じて|see you|bye|close|goodbye)/i, action: 'close' },
       { re: /戻(?:って|る)|back/i, action: 'back' },
     ];
+  }
+
+  resolveAppAlias(spoken) {
+    const lower = spoken.toLowerCase().trim();
+    if (this.appAliases[lower]) return this.appAliases[lower];
+    let best = null;
+    let bestLen = 0;
+    for (const [alias, real] of Object.entries(this.appAliases)) {
+      if (lower.includes(alias.toLowerCase()) && alias.length > bestLen) {
+        best = real;
+        bestLen = alias.length;
+      }
+    }
+    return best || spoken;
   }
 
   parse(text) {
@@ -4605,6 +4770,19 @@ class VoiceCommandParser {
         const target = m[p.group].trim();
         if (/休|release|free/i.test(text)) return { intent: 'release', target };
         return { intent: 'assign', target };
+      }
+    }
+
+    // 4.5 macOS app launch
+    for (const p of this.appLaunchPatterns) {
+      const m = text.match(p.re);
+      if (m) {
+        const spoken = m[p.group].trim();
+        const lower = spoken.toLowerCase();
+        // Don't match worker names — those are handled by talk/navigate
+        if (['coder', 'コーダー', 'researcher', 'reviewer'].some(k => lower.includes(k))) continue;
+        const resolved = this.resolveAppAlias(spoken);
+        return { intent: 'macos.launch', app: resolved, spoken };
       }
     }
 
@@ -4810,6 +4988,32 @@ voiceController.onCommand = (text) => {
         ozSpeak(`${label}を休憩に送りました`);
         showNotification(`${label} released`);
       }
+      break;
+    }
+
+    case 'macos.launch': {
+      ozSpeak(`${cmd.spoken}を開きます`);
+      showNotification(`Launching ${cmd.app}…`);
+      spawnAppLaunchEffect(cmd.app);
+      fetch('/api/macos/launch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent: 'hitomi', app: cmd.app }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.ok) {
+            showNotification(`✅ ${cmd.app} launched`);
+            ozSpeak(`${cmd.spoken}を開きました`);
+          } else if (data.reason === 'user_denied') {
+            showNotification(`❌ ${cmd.app}: denied`);
+          } else if (data.reason === 'capability_denied') {
+            showNotification(`🔐 ${cmd.app}: not allowed`);
+          } else {
+            showNotification(`Launch failed: ${data.error || 'unknown'}`);
+          }
+        })
+        .catch(() => showNotification('Launch error'));
       break;
     }
 

@@ -45,10 +45,16 @@ WORKER_CAPABILITIES: dict[str, dict[str, Permission]] = {
         "economy.assign":   Permission.ALWAYS,
         # ワーカーへの指示は自由
         "agent.dispatch":   Permission.ALWAYS,
+        # macOS 観察系 (read-only) は自由 — 起動はユーザー承認
+        "macos.app.list":     Permission.ALWAYS,
+        "macos.app.running":  Permission.ALWAYS,
+        "macos.window.active": Permission.ALWAYS,
+        "macos.app.focus":    Permission.ALWAYS,   # 既に実行中のものを前面に出すだけ
+        "macos.app.launch":   Permission.USER_APPROVE,
+        "macos.app.quit":     Permission.USER_APPROVE,
         # 危険な操作はユーザー承認
         "file.write":       Permission.USER_APPROVE,
         "external.http":    Permission.USER_APPROVE,
-        "app.launch":       Permission.USER_APPROVE,
         # 完全に禁止
         "file.delete":      Permission.DENY,
         "shell.exec":       Permission.DENY,
