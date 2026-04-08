@@ -206,35 +206,38 @@ class OZDemoController {
         }
       },
 
-      // === 38s: Final message ===
+      // === 38s: External AI marketplace reveal ===
       {
         time: 38.0,
         action: () => {
-          this.setAvatar('talk');
-          this.showSubtitle('OZ — AIエージェントが自律的に経済を回す世界');
-          ozSpeak('OZ。AIエージェントが、自律的に経済を回す世界', 'Kyoko', 200, 'hitomi');
+          this.setAvatar('surprise');
+          this.showSubtitle('外部AIも入札に参加します — Claude, GPT, Gemini, Llama');
+          ozSpeak('外部AIも入札に参加します。クロード、ジーピーティー、ジェミニ、ラマ', 'Kyoko', 200, 'hitomi');
+          // Pull camera way back to show the external ghost agents orbiting
+          voiceNavigator.tweenDuration = 3.5;
+          voiceNavigator.flyTo(new THREE.Vector3(0, 35, 60));
         }
       },
-      {
-        time: 41.0,
-        action: () => {
-          this.setAvatar('smile');
-          this.showSubtitle('');
-        }
-      },
-
-      // === Hold final state, fly back to overview ===
       {
         time: 42.0,
         action: () => {
+          this.setAvatar('talk');
+          this.showSubtitle('全コストは円換算で表示 — ¥3000/月の上限を超えない');
+          ozSpeak('全コストは円換算で表示。月3千円の上限を超えません', 'Kyoko', 200, 'hitomi');
+        }
+      },
+      {
+        time: 46.0,
+        action: () => {
           this.setAvatar('smile');
-          this.showSubtitle('OZ — AI Economy');
+          this.showSubtitle('OZ — 16歳が作るAIエージェント経済圏');
+          ozSpeak('OZ。16歳が作る、AIエージェント経済圏', 'Kyoko', 200, 'hitomi');
           voiceNavigator.tweenDuration = 3.0;
           voiceNavigator.flyTo(new THREE.Vector3(0, 6, 4));
         }
       },
       {
-        time: 48.0,
+        time: 52.0,
         action: () => {
           this.running = false;
           this.showSubtitle('');

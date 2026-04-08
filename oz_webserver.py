@@ -17,6 +17,7 @@ import subprocess
 import oz_economy
 import oz_agents
 import oz_bidding
+import oz_external
 
 PORT = 8767
 DIRECTORY = os.path.dirname(os.path.abspath(__file__))
@@ -114,6 +115,21 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
             self._send_json(oz_economy.verify_chain())
             return
 
+        if self.path == "/api/external/providers":
+            providers = []
+            for name, info in oz_external.EXTERNAL_PROVIDERS.items():
+                providers.append({
+                    "id": name,
+                    "label": info["label"],
+                    "emoji": info["emoji"],
+                    "color": info["color"],
+                    "real_cost_jpy": info["real_cost_jpy"],
+                    "real_cost_ozc": oz_external.jpy_to_ozc(info["real_cost_jpy"]),
+                    "specialty_keywords": info["specialty_keywords"],
+                })
+            self._send_json({"providers": providers, "ozc_to_jpy": oz_external.OZC_TO_JPY})
+            return
+
         # 静的ファイル配信にフォールバック
         super().do_GET()
 
@@ -208,6 +224,77 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json({"ok": True, "tx": tx})
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, status=400)
+            return
+
+        # OZ Store — buying OZC with real money (mock checkout)
+        if self.path == "/api/store/purchase":
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            try:
+                data = json.loads(body)
+                package = data.get("package")
+                packages = {
+                    "starter":  {"ozc": 1000,  "jpy": 100},
+                    "standard": {"ozc": 5000,  "jpy": 450},
+                    "premium":  {"ozc": 12000, "jpy": 1000},
+                    "pro":      {"ozc": 30000, "jpy": 2300},
+                }
+                pkg = packages.get(package)
+                if not pkg:
+                    self._send_json({"ok": False, "error": "unknown package"}, status=400)
+                    return
+
+                # Stub: in production this would call Stripe / KOMOJU / etc.
+                # For now we record the would-be charge to a log file.
+                log_path = os.path.expanduser("~/.openclaw/workspace/oz_store_purchases.jsonl")
+                os.makedirs(os.path.dirname(log_path), exist_ok=True)
+                with open(log_path, "a") as f:
+                    f.write(json.dumps({
+                        "ts": __import__("time").time(),
+                        "package": package,
+                        "ozc": pkg["ozc"],
+                        "jpy": pkg["jpy"],
+                        "stub": True,
+                    }) + "\n")
+
+                # Mint OZC into hitomi's account
+                tx = oz_economy.topup("hitomi", pkg["ozc"], f"store-{package}-jpy{pkg['jpy']}")
+                self._send_json({
+                    "ok": True,
+                    "package": package,
+                    "ozc_received": pkg["ozc"],
+                    "jpy_charged": pkg["jpy"],
+                    "tx": tx,
+                    "note": "stub checkout — real Stripe integration not yet wired",
+                })
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, status=400)
+            return
+
+        if self.path == "/api/external/call":
+            content_length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_length)
+            try:
+                data = json.loads(body)
+                provider = data.get("provider")
+                prompt = data.get("prompt", "")
+                if not provider or not prompt:
+                    self._send_json({"ok": False, "error": "provider and prompt required"}, status=400)
+                    return
+                result = oz_external.call_external(provider, prompt)
+                # Charge hitomi for the call (real cost in OZC)
+                if result.get("ok"):
+                    cost_ozc = oz_external.jpy_to_ozc(result["real_cost_jpy"])
+                    try:
+                        oz_economy.transfer(
+                            "hitomi", "treasury", cost_ozc,
+                            f"external.{provider}", prompt[:60],
+                        )
+                    except Exception:
+                        pass
+                self._send_json(result)
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, status=500)
             return
 
         # === Bidding — agents bid on tasks ===

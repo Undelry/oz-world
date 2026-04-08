@@ -18,6 +18,7 @@ import time
 from typing import Optional
 
 import oz_economy
+import oz_external
 
 # ================================
 # Worker specialties — keyword → cost multiplier
@@ -96,17 +97,27 @@ def calc_bid(worker: str, task: str, current_balance: float) -> float:
     return bid
 
 
-def collect_bids(task: str) -> list:
+def collect_bids(task: str, include_external: bool = True) -> list:
     """
-    Ask every worker to bid on a task.
+    Ask every worker (and optionally external providers) to bid on a task.
 
-    Returns a sorted list of dicts: [{worker, bid, balance}], cheapest first.
+    Returns a sorted list of dicts cheapest-first. Each entry has at least
+    {worker, bid, balance, is_external}.
     """
     bids = []
     for worker in WORKER_SPECIALTIES:
         balance = oz_economy.get_balance(worker)
         bid = calc_bid(worker, task, balance)
-        bids.append({"worker": worker, "bid": bid, "balance": balance})
+        bids.append({
+            "worker": worker,
+            "bid": bid,
+            "balance": balance,
+            "is_external": False,
+        })
+
+    if include_external:
+        for ext_bid in oz_external.get_all_external_bids(task):
+            bids.append(ext_bid)
 
     bids.sort(key=lambda b: b["bid"])
     return bids
@@ -154,6 +165,8 @@ def run_auction(task: str, max_budget: Optional[float] = None) -> dict:
         "bids": bids,
         "winner": winner["worker"],
         "winning_bid": winner["bid"],
+        "is_external": winner.get("is_external", False),
+        "real_cost_jpy": winner.get("real_cost_jpy", 0),
         "tx_id": tx["id"],
         "ts": time.time(),
     }

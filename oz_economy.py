@@ -29,6 +29,13 @@ from typing import Optional
 DB_PATH = os.path.expanduser("~/.openclaw/workspace/oz_economy.db")
 os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
+# 1 OZC ≈ ¥1 (the exchange rate to real currency)
+OZC_TO_JPY = 1.0
+
+
+def ozc_to_jpy(amount: float) -> float:
+    return amount * OZC_TO_JPY
+
 # ================================
 # Pricing — actions and their cost
 # ================================
@@ -75,6 +82,9 @@ INITIAL_BALANCES = {
 
 # 1日の総消費上限 (全エージェント合算)
 DAILY_BUDGET_CAP = 5000
+
+# 1ヶ月の実通貨上限 (¥) — 暴走の最後の防波堤
+MONTHLY_REAL_CAP_JPY = 3000
 
 
 # ================================
@@ -144,14 +154,18 @@ GENESIS_HASH = "0" * 64
 
 
 def _compute_block_hash(tx: dict) -> str:
-    """Hash a transaction record together with the previous block's hash."""
+    """Hash a transaction record together with the previous block's hash.
+
+    All numeric fields are normalized to float and rounded to 6 decimals so that
+    int vs float and storage round-trips don't change the hash.
+    """
     payload = json.dumps(
         {
-            "id": tx["id"],
-            "ts": round(tx["ts"], 6),
+            "id": int(tx["id"]),
+            "ts": round(float(tx["ts"]), 6),
             "from": tx["from_agent"],
             "to": tx["to_agent"],
-            "amount": tx["amount"],
+            "amount": round(float(tx["amount"]), 6),
             "action": tx["action"],
             "detail": tx["detail"] or "",
             "prev": tx["prev_hash"],
@@ -236,6 +250,16 @@ def get_all_balances() -> dict:
         return {agent: float(balance) for agent, balance in rows}
 
 
+# Actions that are exempt from the daily cap (topups, internal accounting moves)
+DAILY_CAP_EXEMPT_ACTIONS = {
+    "topup",            # human buys OZC from store
+    "auto.topup",       # automatic refill
+    "auction.win",      # internal economy plumbing
+    "task.assign",
+    "task.report",
+}
+
+
 def transfer(
     from_agent: str,
     to_agent: str,
@@ -267,18 +291,19 @@ def transfer(
                     "INSERT INTO balances (agent, balance) VALUES (?, ?)", (a, 0)
                 )
 
-        # Check daily cap
-        today_start = _today_start_ts()
-        cur.execute(
-            "SELECT COALESCE(SUM(amount), 0) FROM ledger WHERE ts >= ?",
-            (today_start,),
-        )
-        spent_today = float(cur.fetchone()[0])
-        if spent_today + amount > DAILY_BUDGET_CAP:
-            conn.close()
-            raise ValueError(
-                f"daily budget cap exceeded: spent={spent_today} + {amount} > {DAILY_BUDGET_CAP}"
+        # Check daily cap (exempt internal moves and topups)
+        if action not in DAILY_CAP_EXEMPT_ACTIONS:
+            today_start = _today_start_ts()
+            cur.execute(
+                "SELECT COALESCE(SUM(amount), 0) FROM ledger WHERE ts >= ? AND action NOT IN ('topup','auto.topup','auction.win','task.assign','task.report')",
+                (today_start,),
             )
+            spent_today = float(cur.fetchone()[0])
+            if spent_today + amount > DAILY_BUDGET_CAP:
+                conn.close()
+                raise ValueError(
+                    f"daily budget cap exceeded: spent={spent_today} + {amount} > {DAILY_BUDGET_CAP}"
+                )
 
         # Check from balance
         cur.execute("SELECT balance FROM balances WHERE agent = ?", (from_agent,))
@@ -413,22 +438,37 @@ def get_ledger(limit: int = 50, since_ts: Optional[float] = None) -> list:
 
 
 def get_daily_stats() -> dict:
-    """Return today's spending stats."""
+    """Return today's + this month's REAL resource spending (excludes topups + internal moves)."""
     today_start = _today_start_ts()
+    month_start = _month_start_ts()
+    exempt_clause = "action NOT IN ('topup','auto.topup','auction.win','task.assign','task.report')"
     with _lock:
         conn = _conn()
         cur = conn.cursor()
         cur.execute(
-            "SELECT COALESCE(SUM(amount), 0), COUNT(*) FROM ledger WHERE ts >= ?",
+            f"SELECT COALESCE(SUM(amount), 0), COUNT(*) FROM ledger WHERE ts >= ? AND {exempt_clause}",
             (today_start,),
         )
-        spent, count = cur.fetchone()
+        spent_today, count_today = cur.fetchone()
+        cur.execute(
+            f"SELECT COALESCE(SUM(amount), 0), COUNT(*) FROM ledger WHERE ts >= ? AND {exempt_clause}",
+            (month_start,),
+        )
+        spent_month, count_month = cur.fetchone()
         conn.close()
         return {
-            "spent_today": float(spent),
-            "transactions_today": int(count),
+            "spent_today": float(spent_today),
+            "spent_today_jpy": ozc_to_jpy(float(spent_today)),
+            "spent_month": float(spent_month),
+            "spent_month_jpy": ozc_to_jpy(float(spent_month)),
+            "transactions_today": int(count_today),
+            "transactions_month": int(count_month),
             "daily_cap": DAILY_BUDGET_CAP,
-            "remaining": float(DAILY_BUDGET_CAP - spent),
+            "daily_cap_jpy": ozc_to_jpy(DAILY_BUDGET_CAP),
+            "monthly_cap_jpy": MONTHLY_REAL_CAP_JPY,
+            "monthly_remaining_jpy": MONTHLY_REAL_CAP_JPY - ozc_to_jpy(float(spent_month)),
+            "remaining": float(DAILY_BUDGET_CAP - spent_today),
+            "ozc_to_jpy": OZC_TO_JPY,
         }
 
 
@@ -462,6 +502,13 @@ def _today_start_ts() -> float:
     """Return the unix timestamp at the start of today (local time)."""
     now = datetime.now()
     start = datetime(now.year, now.month, now.day)
+    return start.timestamp()
+
+
+def _month_start_ts() -> float:
+    """Return the unix timestamp at the start of this month (local time)."""
+    now = datetime.now()
+    start = datetime(now.year, now.month, 1)
     return start.timestamp()
 
 

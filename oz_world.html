@@ -631,6 +631,121 @@
   }
   .topup-btn:hover { transform: translateY(-1px); }
 
+  /* JPY display in econ panel */
+  .econ-jpy {
+    font-size: 9px;
+    color: rgba(0,0,0,0.4);
+    font-weight: 500;
+  }
+
+  /* Open Store button */
+  .ctrl-store {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(139, 92, 246, 0.12);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    font-size: 10px;
+    color: #6d28d9;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .ctrl-store:hover { background: rgba(139, 92, 246, 0.2); }
+
+  /* OZ Store modal */
+  #storeModal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 520px;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(20px);
+    border-radius: 18px;
+    padding: 28px;
+    z-index: 500;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+    border: 1px solid rgba(139, 92, 246, 0.4);
+    display: none;
+  }
+  #storeModal.show { display: block; }
+  #storeModal h3 {
+    font-size: 16px;
+    color: #333;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #storeModal h3::before { content: "🛒"; }
+  #storeModal .store-sub {
+    font-size: 11px;
+    color: rgba(0,0,0,0.45);
+    margin-bottom: 18px;
+  }
+  #storeModal .store-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .store-pkg {
+    border: 2px solid rgba(0,0,0,0.06);
+    border-radius: 14px;
+    padding: 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: linear-gradient(135deg, rgba(255,255,255,1), rgba(250,250,255,1));
+  }
+  .store-pkg:hover {
+    transform: translateY(-2px);
+    border-color: #8338ec;
+    box-shadow: 0 8px 24px rgba(131, 56, 236, 0.15);
+  }
+  .store-pkg .pkg-name {
+    font-size: 11px;
+    color: rgba(0,0,0,0.45);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 6px;
+  }
+  .store-pkg .pkg-ozc {
+    font-size: 22px;
+    font-weight: 800;
+    color: #b8860b;
+    margin: 4px 0;
+  }
+  .store-pkg .pkg-jpy {
+    font-size: 14px;
+    color: #333;
+    font-weight: 600;
+  }
+  .store-pkg .pkg-rate {
+    font-size: 9px;
+    color: rgba(0,0,0,0.35);
+    margin-top: 6px;
+  }
+  #storeClose {
+    margin-top: 18px;
+    padding: 8px 18px;
+    background: rgba(0,0,0,0.05);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #555;
+  }
+  #storeNote {
+    font-size: 10px;
+    color: rgba(0,0,0,0.4);
+    margin-top: 12px;
+    text-align: center;
+    font-style: italic;
+  }
+
   /* Bottom bar coin indicator */
   .ctrl-coin {
     display: flex;
@@ -920,7 +1035,8 @@
     <span class="voice-mic-label" id="voiceMicLabel">OFF</span>
   </div>
   <span class="spacer"></span>
-  <span class="ctrl-task" id="ctrlTask" title="Open task auction (B)">📋 Auction</span>
+  <span class="ctrl-store" id="ctrlStore" title="Buy OZC">🛒 Store</span>
+  <span class="ctrl-task" id="ctrlTask" title="Open task auction (B)" style="margin-left:6px;">📋 Auction</span>
   <span class="ctrl-coin" id="ctrlCoin" title="Today's OZC consumption" style="margin-left:6px;">🪙 0 / 5000 OZC</span>
   <span class="position-info" id="posInfo" style="margin-left:12px;">x:0 y:0 z:0</span>
 </div>
@@ -936,7 +1052,7 @@
   <div class="econ-title">OZ Economy</div>
   <div class="econ-stat">
     <span class="econ-stat-label">Today spent</span>
-    <span class="econ-stat-val" id="econSpent">0 OZC</span>
+    <span class="econ-stat-val" id="econSpent">0 OZC <span class="econ-jpy" id="econSpentJpy">¥0</span></span>
   </div>
   <div class="econ-stat">
     <span class="econ-stat-label">Daily cap</span>
@@ -944,6 +1060,10 @@
   </div>
   <div class="econ-bar"><div class="econ-bar-fill" id="econBarFill" style="width: 0%"></div></div>
   <div class="econ-stat" style="margin-top:6px;">
+    <span class="econ-stat-label">This month</span>
+    <span class="econ-stat-val" id="econMonthJpy">¥0 / ¥3000</span>
+  </div>
+  <div class="econ-stat" style="margin-top:2px;">
     <span class="econ-stat-label">Chain</span>
     <span class="econ-stat-val" id="econChainStatus" title="ledger blockchain integrity">⏳ checking</span>
   </div>
@@ -995,6 +1115,42 @@
 
 <!-- Proximity Hint -->
 <div id="proximityHint">Press <b>E</b> to talk</div>
+
+<!-- OZ Store Modal -->
+<div id="storeModal">
+  <h3>OZ Store — Buy OZC</h3>
+  <div class="store-sub">本物の通貨で OZコインを購入できます。AIエージェントの稼働を支えます。</div>
+  <div class="store-grid">
+    <div class="store-pkg" data-package="starter">
+      <div class="pkg-name">Starter</div>
+      <div class="pkg-ozc">1,000 OZC</div>
+      <div class="pkg-jpy">¥100</div>
+      <div class="pkg-rate">¥0.10 / OZC</div>
+    </div>
+    <div class="store-pkg" data-package="standard">
+      <div class="pkg-name">Standard</div>
+      <div class="pkg-ozc">5,000 OZC</div>
+      <div class="pkg-jpy">¥450</div>
+      <div class="pkg-rate">¥0.09 / OZC · 10% off</div>
+    </div>
+    <div class="store-pkg" data-package="premium">
+      <div class="pkg-name">Premium</div>
+      <div class="pkg-ozc">12,000 OZC</div>
+      <div class="pkg-jpy">¥1,000</div>
+      <div class="pkg-rate">¥0.083 / OZC · 17% off</div>
+    </div>
+    <div class="store-pkg" data-package="pro">
+      <div class="pkg-name">Pro</div>
+      <div class="pkg-ozc">30,000 OZC</div>
+      <div class="pkg-jpy">¥2,300</div>
+      <div class="pkg-rate">¥0.077 / OZC · 23% off</div>
+    </div>
+  </div>
+  <div id="storeNote">※ 現在は決済スタブモード — 実際にはチャージされません</div>
+  <div style="text-align:center; margin-top:8px;">
+    <button id="storeClose">Close</button>
+  </div>
+</div>
 
 <!-- Task Auction Modal -->
 <div id="auctionModal">
@@ -2389,8 +2545,11 @@ function fetchEconomyState() {
       economyState.cap = data.daily_cap;
       const pct = Math.min(100, (data.spent_today / data.daily_cap) * 100);
       document.getElementById('econBarFill').style.width = pct + '%';
-      document.getElementById('econSpent').textContent = Math.round(data.spent_today) + ' OZC';
+      document.getElementById('econSpent').innerHTML =
+        `${Math.round(data.spent_today)} OZC <span class="econ-jpy">¥${Math.round(data.spent_today_jpy || 0)}</span>`;
       document.getElementById('econCap').textContent = Math.round(data.daily_cap) + ' OZC';
+      document.getElementById('econMonthJpy').textContent =
+        `¥${Math.round(data.spent_month_jpy || 0)} / ¥${Math.round(data.monthly_cap_jpy || 3000)}`;
       document.getElementById('ctrlCoin').textContent =
         `🪙 ${Math.round(data.spent_today)} / ${Math.round(data.daily_cap)} OZC`;
     })
@@ -2473,6 +2632,191 @@ function escapeHtml(s) {
   }[c]));
 }
 
+// ============================
+// External AI Marketplace — ghost agents at the edge of the world
+// ============================
+const externalProviders = []; // populated from /api/external/providers
+const externalAvatars = {}; // providerId -> THREE.Group
+
+// Position external agents in a ring far from the main island
+const EXT_RADIUS = 38;
+const EXT_HEIGHT = 12;
+
+function loadExternalProviders() {
+  fetch('/api/external/providers')
+    .then(r => r.json())
+    .then(data => {
+      externalProviders.length = 0;
+      externalProviders.push(...data.providers);
+      // Spawn 3D ghost avatars
+      data.providers.forEach((p, idx) => {
+        if (externalAvatars[p.id]) return;
+        const angle = (idx / data.providers.length) * Math.PI * 2;
+        const x = Math.cos(angle) * EXT_RADIUS;
+        const z = Math.sin(angle) * EXT_RADIUS;
+        externalAvatars[p.id] = createExternalAvatar(p, x, EXT_HEIGHT, z);
+      });
+    })
+    .catch(() => {});
+}
+
+function createExternalAvatar(provider, x, y, z) {
+  const group = new THREE.Group();
+  const colorHex = parseInt(provider.color.replace('#', ''), 16);
+
+  // Translucent ghost body — sphere
+  const body = new THREE.Mesh(
+    new THREE.SphereGeometry(1.4, 16, 16),
+    new THREE.MeshStandardMaterial({
+      color: colorHex,
+      emissive: colorHex,
+      emissiveIntensity: 0.6,
+      transparent: true,
+      opacity: 0.55,
+      roughness: 0.2,
+      metalness: 0.4,
+    }),
+  );
+  group.add(body);
+
+  // Outer glow — bigger transparent sphere
+  const glow = new THREE.Mesh(
+    new THREE.SphereGeometry(2.0, 16, 16),
+    new THREE.MeshBasicMaterial({
+      color: colorHex,
+      transparent: true,
+      opacity: 0.12,
+    }),
+  );
+  group.add(glow);
+
+  // Orbiting ring — marks them as external
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(2.4, 0.06, 8, 32),
+    new THREE.MeshBasicMaterial({
+      color: colorHex,
+      transparent: true,
+      opacity: 0.7,
+    }),
+  );
+  ring.rotation.x = Math.PI / 2;
+  group.add(ring);
+
+  // Label sprite — name + cost
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  ctx.strokeStyle = provider.color;
+  ctx.lineWidth = 2;
+  if (ctx.roundRect) ctx.roundRect(4, 4, 248, 56, 12);
+  else ctx.rect(4, 4, 248, 56);
+  ctx.fill();
+  ctx.stroke();
+  ctx.font = '24px serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(provider.emoji, 12, 32);
+  ctx.fillStyle = '#333';
+  ctx.font = 'bold 14px Inter, sans-serif';
+  ctx.fillText(provider.label, 44, 24);
+  ctx.fillStyle = '#b8860b';
+  ctx.font = 'bold 12px Inter, sans-serif';
+  ctx.fillText(`¥${provider.real_cost_jpy} / call`, 44, 42);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true }));
+  sprite.scale.set(3.6, 0.9, 1);
+  sprite.position.y = 3.0;
+  group.add(sprite);
+
+  // Animation state
+  group.userData = {
+    baseY: y,
+    baseAngle: Math.atan2(z, x),
+    radius: Math.sqrt(x * x + z * z),
+    spinPhase: Math.random() * Math.PI * 2,
+    body, glow, ring, sprite,
+  };
+
+  group.position.set(x, y, z);
+  scene.add(group);
+  return group;
+}
+
+function updateExternalAvatars(t) {
+  Object.values(externalAvatars).forEach(group => {
+    const ud = group.userData;
+    if (!ud) return;
+    // Slow orbit around the world
+    const angle = ud.baseAngle + t * 0.02;
+    group.position.x = Math.cos(angle) * ud.radius;
+    group.position.z = Math.sin(angle) * ud.radius;
+    group.position.y = ud.baseY + Math.sin(t * 0.5 + ud.spinPhase) * 0.6;
+    ud.ring.rotation.z = t * 0.5;
+    ud.body.rotation.y = t * 0.3;
+  });
+}
+
+// Override getAgentWorldPos to also handle external providers
+const __origGetAgentWorldPos = getAgentWorldPos;
+window.getAgentWorldPos = function(name) {
+  // First try the original (workers, hitomi, treasury, human)
+  const fromOrig = __origGetAgentWorldPos(name);
+  if (fromOrig) return fromOrig;
+  // Then try external providers
+  const ext = externalAvatars[name];
+  if (ext) return new THREE.Vector3(ext.position.x, ext.position.y, ext.position.z);
+  return null;
+};
+
+setTimeout(loadExternalProviders, 1500);
+
+
+// ============================
+// OZ Store
+// ============================
+function openStore() {
+  document.getElementById('storeModal').classList.add('show');
+}
+function closeStore() {
+  document.getElementById('storeModal').classList.remove('show');
+}
+function purchasePackage(pkg) {
+  fetch('/api/store/purchase', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ package: pkg }),
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        showNotification(`✨ ${data.ozc_received} OZC purchased for ¥${data.jpy_charged}`);
+        // Coin shower from sky into hitomi
+        const toPos = getAgentWorldPos('hitomi');
+        for (let i = 0; i < 5; i++) {
+          const fromPos = new THREE.Vector3(
+            (Math.random() - 0.5) * 8,
+            30 + Math.random() * 6,
+            (Math.random() - 0.5) * 8,
+          );
+          if (toPos) spawnFlyingCoin(fromPos, toPos, data.ozc_received / 5);
+        }
+        ozSpeak(`${data.ozc_received}オーゼットコインを購入しました`, 'Kyoko', 200, 'hitomi');
+      } else {
+        showNotification(`Purchase failed: ${data.error}`);
+      }
+      closeStore();
+    });
+}
+
+document.getElementById('ctrlStore').addEventListener('click', openStore);
+document.getElementById('storeClose').addEventListener('click', closeStore);
+document.querySelectorAll('.store-pkg').forEach(el => {
+  el.addEventListener('click', () => purchasePackage(el.dataset.package));
+});
+
+
 // Verify the chain integrity periodically (every 6s)
 function verifyChain() {
   fetch('/api/economy/verify')
@@ -2539,9 +2883,9 @@ function fetchBids() {
       renderBids(data.bids);
       document.getElementById('auctionAward').style.display = 'inline-block';
 
-      // Spawn floating bid sprites above workers in the 3D world
+      // Spawn floating bid sprites above workers (and external avatars) in the 3D world
       data.bids.forEach((b, idx) => {
-        spawnBidLabel(b.worker, b.bid, idx === 0);
+        spawnBidLabel(b.worker, b.bid, idx === 0, b.is_external);
       });
     })
     .catch(err => {
@@ -2553,12 +2897,16 @@ function fetchBids() {
 function renderBids(bids) {
   const list = document.getElementById('auctionBidsList');
   list.innerHTML = bids.map((b, idx) => {
-    const wType = WORKER_TYPES[b.worker];
+    const isExternal = b.is_external;
+    const emoji = isExternal ? b.emoji : (WORKER_TYPES[b.worker]?.emoji || '?');
+    const label = isExternal ? b.label : (WORKER_TYPES[b.worker]?.label || b.worker);
     const isWinner = idx === 0;
+    const externalBadge = isExternal ?
+      `<span style="font-size:9px; padding:2px 6px; background:rgba(139,92,246,0.15); color:#6d28d9; border-radius:6px; margin-left:6px;">EXT ¥${b.real_cost_jpy}</span>` : '';
     return `<div class="bid-row ${isWinner ? 'winner' : ''}">
       <div class="bid-rank">#${idx + 1}</div>
-      <div class="bid-emoji">${wType.emoji}</div>
-      <div class="bid-name">${wType.label}</div>
+      <div class="bid-emoji">${emoji}</div>
+      <div class="bid-name">${label}${externalBadge}</div>
       <div class="bid-amount">${Math.round(b.bid)} OZC</div>
     </div>`;
   }).join('');
@@ -2578,14 +2926,44 @@ function awardAuction() {
         showNotification(`Auction failed: ${data.error}`);
         return;
       }
-      const wType = WORKER_TYPES[data.winner];
-      showNotification(`${wType.emoji} ${wType.label} won the auction (${Math.round(data.winning_bid)} OZC)`);
-      ozSpeak(`${wType.label}が${Math.round(data.winning_bid)}オーゼットコインで落札しました`, 'Kyoko', 200, 'hitomi');
-      // Trigger the worker to actually start working
-      const worker = workers.find(w => w.type === data.winner);
-      if (worker) {
-        worker.task = task;
-        if (worker.state !== 'coding') assignWork(worker);
+
+      if (data.is_external) {
+        // External provider won — outsource to a real API
+        const ext = externalProviders.find(p => p.id === data.winner);
+        const label = ext ? ext.label : data.winner;
+        showNotification(
+          `🌌 ${label} won — outsourcing (¥${data.real_cost_jpy} real cost)`
+        );
+        ozSpeak(
+          `${label}が落札しました。実コスト${data.real_cost_jpy}円`,
+          'Kyoko', 200, 'hitomi',
+        );
+        // Fly a coin from hitomi to the external avatar
+        const fromPos = getAgentWorldPos('hitomi');
+        const toPos = getAgentWorldPos(data.winner);
+        if (fromPos && toPos) spawnFlyingCoin(fromPos, toPos, data.winning_bid);
+        // Actually call the external provider
+        fetch('/api/external/call', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: data.winner, prompt: task }),
+        })
+          .then(r => r.json())
+          .then(callRes => {
+            if (callRes.ok) {
+              showNotification(`${label}: ${callRes.reply.slice(0, 60)}…`);
+            }
+          });
+      } else {
+        const wType = WORKER_TYPES[data.winner];
+        showNotification(`${wType.emoji} ${wType.label} won the auction (${Math.round(data.winning_bid)} OZC)`);
+        ozSpeak(`${wType.label}が${Math.round(data.winning_bid)}オーゼットコインで落札しました`, 'Kyoko', 200, 'hitomi');
+        // Trigger the worker to actually start working
+        const worker = workers.find(w => w.type === data.winner);
+        if (worker) {
+          worker.task = task;
+          if (worker.state !== 'coding') assignWork(worker);
+        }
       }
       closeAuction();
     });
@@ -2594,9 +2972,20 @@ function awardAuction() {
 // Floating bid sprites that appear above workers during an auction
 const bidLabels = [];
 
-function spawnBidLabel(workerType, bid, isWinner) {
+function spawnBidLabel(workerType, bid, isWinner, isExternal = false) {
+  // For external providers, anchor to the ghost avatar instead of a worker
+  if (isExternal) {
+    const ext = externalAvatars[workerType];
+    if (!ext) return;
+    spawnBidLabelAt(ext, bid, isWinner, true);
+    return;
+  }
   const worker = workers.find(w => w.type === workerType);
   if (!worker) return;
+  spawnBidLabelAt(worker.group, bid, isWinner, false);
+}
+
+function spawnBidLabelAt(anchorGroup, bid, isWinner, isExternal) {
 
   const canvas = document.createElement('canvas');
   canvas.width = 160; canvas.height = 50;
@@ -2626,14 +3015,14 @@ function spawnBidLabel(workerType, bid, isWinner) {
   }));
   sprite.scale.set(2.0, 0.6, 1);
   sprite.position.set(
-    worker.group.position.x,
-    worker.group.position.y + 5,
-    worker.group.position.z,
+    anchorGroup.position.x,
+    anchorGroup.position.y + 5,
+    anchorGroup.position.z,
   );
   scene.add(sprite);
   bidLabels.push({
     sprite,
-    worker,
+    anchor: anchorGroup,
     bornAt: performance.now(),
     lifetime: 6000,
   });
@@ -2655,12 +3044,12 @@ function updateBidLabels() {
     else if (age > b.lifetime - 800) opacity = (b.lifetime - age) / 800;
     else opacity = 1;
     b.sprite.material.opacity = opacity * 0.95;
-    // Float upward and follow worker
+    // Float upward and follow the anchor (worker group or external avatar)
     const floatOffset = Math.min(1.5, age / 1500) * 1.5;
     b.sprite.position.set(
-      b.worker.group.position.x,
-      b.worker.group.position.y + 5 + floatOffset,
-      b.worker.group.position.z,
+      b.anchor.position.x,
+      b.anchor.position.y + 5 + floatOffset,
+      b.anchor.position.z,
     );
   }
 }
@@ -3778,6 +4167,7 @@ function animate() {
   updateFlyingCoins(t);
   updateWorkerBalanceLabels();
   updateBidLabels();
+  updateExternalAvatars(t);
 
   // --- Voice navigator camera tween ---
   voiceNavigator.update();

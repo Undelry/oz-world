@@ -16,7 +16,7 @@ OZ_DIR="$(cd "$(dirname "$0")" && pwd)"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 OUTPUT="$OZ_DIR/oz_demo_audio_${TIMESTAMP}.mp4"
 AUDIO_DIR="/tmp/oz_audio_${TIMESTAMP}"
-DURATION=50
+DURATION=55
 PORT=8767
 
 mkdir -p "$AUDIO_DIR"
@@ -38,7 +38,9 @@ declare -a LINES=(
     "26.0:紫の島に行って"
     "29.0:そしてエージェント同士は、暗号通貨で取引しています"
     "33.0:全てのタスク、LLM呼び出し、通知がOZコインで精算されます"
-    "38.0:OZ。AIエージェントが、自律的に経済を回す世界"
+    "38.0:外部AIも入札に参加します。クロード、ジーピーティー、ジェミニ、ラマ"
+    "42.0:全コストは円換算で表示。月3千円の上限を超えません"
+    "46.0:OZ。16歳が作る、AIエージェント経済圏"
 )
 
 for i in "${!LINES[@]}"; do
