@@ -1199,21 +1199,18 @@
 <!-- Right Sidebar -->
 <div id="sidebar">
   <div class="sidebar-section">
-    <div class="sidebar-title">Active Workers</div>
-    <div id="workerList"></div>
-  </div>
-  <div class="sidebar-section">
-    <div class="sidebar-title">hitomi Board</div>
-    <div id="hitomiBoardList"></div>
-  </div>
-  <div class="sidebar-section">
-    <div class="sidebar-title">Running Tasks</div>
-    <div id="taskList"></div>
-  </div>
-  <div class="sidebar-section">
-    <div class="sidebar-title">Team</div>
+    <div class="sidebar-title">Island</div>
     <div class="sidebar-item"><span class="member-dot online"></span> Joe (You)</div>
-    <div class="sidebar-item"><span class="member-dot online"></span> hitomi (AI Orchestrator)</div>
+    <div class="sidebar-item"><span class="member-dot online"></span> hitomi (AI)</div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Active Sessions</div>
+    <div id="workerList" style="font-size:10px; color:rgba(0,0,0,0.4);">No active sessions</div>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-title">Quick</div>
+    <div class="sidebar-item" style="cursor:pointer;" onclick="if(typeof openMarketplace==='function')openMarketplace()">🏪 Marketplace</div>
+    <div class="sidebar-item" style="cursor:pointer;" onclick="if(typeof toggleNetwork==='function')toggleNetwork()">🌐 Network Map</div>
   </div>
 </div>
 
@@ -2124,93 +2121,9 @@ function createWorkerAvatar(type, position, task = '') {
 }
 
 
-// --- Worker Desks ---
-function createDesk(x, z, rotation, accentColor) {
-  const group = new THREE.Group();
-
-  const deskMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.25, metalness: 0.2 });
-  const deskTop = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.12, 1.2), deskMat);
-  deskTop.position.y = 1.8;
-  group.add(deskTop);
-
-  // Accent strip
-  const stripMat = new THREE.MeshBasicMaterial({ color: accentColor });
-  const strip = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.04, 0.05), stripMat);
-  strip.position.set(0, 1.87, -0.6);
-  group.add(strip);
-
-  // Legs
-  const legGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.8, 6);
-  const legMat = new THREE.MeshStandardMaterial({ color: 0xe0e0e0, metalness: 0.5 });
-  [[-1, 0.9, -0.45], [1, 0.9, -0.45], [-1, 0.9, 0.45], [1, 0.9, 0.45]].forEach(p => {
-    group.add(new THREE.Mesh(legGeo, legMat).translateX(p[0]).translateY(p[1]).translateZ(p[2]));
-  });
-
-  // Laptop
-  const laptop = new THREE.Mesh(
-    new THREE.BoxGeometry(0.8, 0.03, 0.5),
-    new THREE.MeshStandardMaterial({ color: 0xeaeaf0, metalness: 0.6, roughness: 0.2 })
-  );
-  laptop.position.set(0, 1.9, -0.1);
-  group.add(laptop);
-
-  // Laptop screen
-  const ls = new THREE.Mesh(
-    new THREE.BoxGeometry(0.76, 0.5, 0.02),
-    new THREE.MeshBasicMaterial({ color: accentColor })
-  );
-  ls.position.set(0, 2.16, -0.36);
-  ls.rotation.x = -0.15;
-  group.add(ls);
-
-  // Chair
-  const chairMat = new THREE.MeshStandardMaterial({ color: 0xf4f4f8, roughness: 0.4 });
-  const seat = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.08, 0.7), chairMat);
-  seat.position.set(0, 1.2, 0.8);
-  group.add(seat);
-  const back = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.06), chairMat);
-  back.position.set(0, 1.6, 1.15);
-  group.add(back);
-
-  group.position.set(x, 1, z);
-  group.rotation.y = rotation;
-  scene.add(group);
-  return group;
-}
-
-// Desk positions — semicircle facing monitor
-const deskDefs = [
-  { x: -8, z: 3, rot: 0.4, type: 'scheduler' },
-  { x: -4, z: 5, rot: 0.15, type: 'researcher' },
-  { x: 0,  z: 6, rot: 0, type: 'coder' },
-  { x: 4,  z: 5, rot: -0.15, type: 'reviewer' },
-  { x: -6, z: -4, rot: 2.8, type: 'debugger' },
-  { x: 6,  z: -4, rot: -2.8, type: 'writer' },
-];
-
-deskDefs.forEach(d => {
-  createDesk(d.x, d.z, d.rot, WORKER_TYPES[d.type].color);
-});
-
-// Workers at desks (some coding, some idle/relaxing)
-const workerDefs = [
-  { type: 'scheduler',  deskPos: new THREE.Vector3(-8, 1.2, 4),   sofaPos: new THREE.Vector3(8, 1.2, 7.5),   task: 'スプリント計画を調整中', state: 'coding', intensity: 0.5 },
-  { type: 'researcher', deskPos: new THREE.Vector3(-4, 1.2, 6),   sofaPos: new THREE.Vector3(9.5, 1.2, 6),   task: 'マーケットデータ分析中', state: 'coding', intensity: 0.7 },
-  { type: 'coder',      deskPos: new THREE.Vector3(0, 1.2, 7),    sofaPos: new THREE.Vector3(10, 1.2, 5),    task: 'APIエンドポイント実装中', state: 'coding', intensity: 0.9 },
-  { type: 'reviewer',   deskPos: new THREE.Vector3(4, 1.2, 6),    sofaPos: new THREE.Vector3(8.5, 1.2, 8),   task: 'PR #42 コードレビュー中', state: 'coding', intensity: 0.6 },
-  { type: 'debugger',   deskPos: new THREE.Vector3(-6, 1.2, -3),  sofaPos: new THREE.Vector3(7.5, 1.2, 6.5), task: 'クラッシュログ調査中',     state: 'relaxing', intensity: 0 },
-  { type: 'writer',     deskPos: new THREE.Vector3(6, 1.2, -3),   sofaPos: new THREE.Vector3(10.5, 1.2, 7),  task: 'ドキュメント更新中',       state: 'relaxing', intensity: 0 },
-];
-
-workerDefs.forEach(w => {
-  const startPos = w.state === 'relaxing' ? w.sofaPos : w.deskPos;
-  const worker = createWorkerAvatar(w.type, startPos, w.task);
-  worker.state = w.state;
-  worker.intensity = w.intensity;
-  worker.deskPos = w.deskPos;
-  worker.sofaPos = w.sofaPos;
-  worker.seatPos = startPos.clone();
-});
+// Desks and fixed workers removed.
+// The island is now clean: just hitomi tower + monitor + board + sofa + Joe.
+// Workers will spawn dynamically when real sessions are running (future).
 
 
 // ============================
@@ -2341,41 +2254,154 @@ function createColorIsland(x, y, z, radius, color, sides = 6) {
   return group;
 }
 
-const subIslands = [
-  createColorIsland(-24, -2, -10, 6, OZ.pink, 5),
-  createColorIsland(26, 4, -14, 5, OZ.cyan, 8),
-  createColorIsland(-17, 6, -24, 4, OZ.yellow, 6),
-  createColorIsland(20, -3, 12, 4.5, OZ.green, 7),
-  createColorIsland(0, 10, -32, 3, OZ.purple, 5),
-  createColorIsland(-30, 3, 5, 3, OZ.orange, 6),
-];
-subIslands.forEach(isl => { isl.userData = { baseY: isl.position.y }; });
+// Sub-islands and bridges removed. The world is now:
+// - One main island (Joe's home)
+// - Marketplace island (the shop)
+// - Future: one island per user in multi-player
+const subIslands = []; // kept as empty array for code that references it
 
 
 // ============================
-// Bridges
+// Marketplace Island — the Shop (あつ森スタイル)
 // ============================
-function createBridge(start, end, color) {
-  const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-  mid.y += 4;
-  const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
-  const tube = new THREE.Mesh(
-    new THREE.TubeGeometry(curve, 48, 0.12, 8, false),
-    new THREE.MeshStandardMaterial({
-      color, emissive: color, emissiveIntensity: 0.3,
-      roughness: 0.3, metalness: 0.4, transparent: true, opacity: 0.9,
-    })
-  );
-  scene.add(tube);
-  return tube;
+const marketIslandGroup = new THREE.Group();
+
+// Island base (round, warm color)
+const marketIslandBase = new THREE.Mesh(
+  new THREE.CylinderGeometry(8, 9, 1.5, 8),
+  new THREE.MeshStandardMaterial({ color: 0xfff5e0, roughness: 0.3, metalness: 0.05 }),
+);
+marketIslandGroup.add(marketIslandBase);
+
+// Edge glow ring
+const marketRing = new THREE.Mesh(
+  new THREE.TorusGeometry(8.5, 0.15, 8, 8),
+  new THREE.MeshStandardMaterial({
+    color: OZ.yellow, emissive: OZ.yellow, emissiveIntensity: 0.5,
+    roughness: 0.2, metalness: 0.4,
+  }),
+);
+marketRing.rotation.x = Math.PI / 2;
+marketRing.position.y = 0.75;
+marketIslandGroup.add(marketRing);
+
+// Bottom cone
+const marketBottom = new THREE.Mesh(
+  new THREE.ConeGeometry(9, 6, 8),
+  new THREE.MeshStandardMaterial({ color: 0xf0e8d8, roughness: 0.5 }),
+);
+marketBottom.position.y = -3.5;
+marketBottom.rotation.x = Math.PI;
+marketIslandGroup.add(marketBottom);
+
+// Shop building — a cozy rectangular structure
+const shopGroup = new THREE.Group();
+
+// Walls (warm wood color)
+const wallMat = new THREE.MeshStandardMaterial({ color: 0xe8d5b0, roughness: 0.6, metalness: 0.05 });
+const wallFront = new THREE.Mesh(new THREE.BoxGeometry(6, 4, 0.3), wallMat);
+wallFront.position.set(0, 3, -2.5);
+shopGroup.add(wallFront);
+const wallLeft = new THREE.Mesh(new THREE.BoxGeometry(0.3, 4, 5), wallMat);
+wallLeft.position.set(-3, 3, 0);
+shopGroup.add(wallLeft);
+const wallRight = new THREE.Mesh(new THREE.BoxGeometry(0.3, 4, 5), wallMat);
+wallRight.position.set(3, 3, 0);
+shopGroup.add(wallRight);
+
+// Roof (triangle prism — using a custom approach with a box + slight rotate)
+const roofMat = new THREE.MeshStandardMaterial({
+  color: OZ.coral, emissive: OZ.coral, emissiveIntensity: 0.2,
+  roughness: 0.4, metalness: 0.1,
+});
+const roofLeft = new THREE.Mesh(new THREE.BoxGeometry(7, 0.2, 4), roofMat);
+roofLeft.position.set(0, 5.5, -0.5);
+roofLeft.rotation.x = 0.3;
+shopGroup.add(roofLeft);
+const roofRight = new THREE.Mesh(new THREE.BoxGeometry(7, 0.2, 4), roofMat);
+roofRight.position.set(0, 5.5, 0.5);
+roofRight.rotation.x = -0.3;
+shopGroup.add(roofRight);
+
+// Door opening (dark rectangle)
+const doorMat = new THREE.MeshBasicMaterial({ color: 0x3a2610 });
+const door = new THREE.Mesh(new THREE.BoxGeometry(1.5, 2.5, 0.31), doorMat);
+door.position.set(0, 2.25, 2.5);
+shopGroup.add(door);
+
+// Sign above the door
+const signCanvas = document.createElement('canvas');
+signCanvas.width = 256; signCanvas.height = 64;
+const signCtx = signCanvas.getContext('2d');
+signCtx.fillStyle = 'rgba(255,248,220,0.95)';
+signCtx.fillRect(0, 0, 256, 64);
+signCtx.strokeStyle = '#b8860b';
+signCtx.lineWidth = 3;
+signCtx.strokeRect(4, 4, 248, 56);
+signCtx.fillStyle = '#5a4400';
+signCtx.font = 'bold 22px Inter, sans-serif';
+signCtx.textAlign = 'center';
+signCtx.fillText('🏪 OZ SKILLS', 128, 40);
+const signTex = new THREE.CanvasTexture(signCanvas);
+const signSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: signTex, transparent: true }));
+signSprite.scale.set(4, 1, 1);
+signSprite.position.set(0, 5, 2.8);
+shopGroup.add(signSprite);
+
+// Shelves inside (visible through the door) — 3 shelves of glowing items
+const shelfMat = new THREE.MeshStandardMaterial({ color: 0xd4b896, roughness: 0.5 });
+for (let y = 1.5; y <= 4; y += 1.2) {
+  const shelf = new THREE.Mesh(new THREE.BoxGeometry(5, 0.12, 2), shelfMat);
+  shelf.position.set(0, y, -1);
+  shopGroup.add(shelf);
+
+  // 3 glowing skill "books" per shelf
+  for (let bx = -1.5; bx <= 1.5; bx += 1.5) {
+    const bookColor = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+    const book = new THREE.Mesh(
+      new THREE.BoxGeometry(0.4, 0.7, 0.6),
+      new THREE.MeshStandardMaterial({
+        color: bookColor, emissive: bookColor, emissiveIntensity: 0.4,
+        roughness: 0.3, metalness: 0.2,
+      }),
+    );
+    book.position.set(bx, y + 0.45, -1 + Math.random() * 0.4);
+    book.rotation.y = Math.random() * 0.3 - 0.15;
+    shopGroup.add(book);
+  }
 }
 
-createBridge(new THREE.Vector3(-12, 1, -3), new THREE.Vector3(-21, -1, -8), OZ.pink);
-createBridge(new THREE.Vector3(12, 1, -3), new THREE.Vector3(23, 5, -12), OZ.cyan);
-createBridge(new THREE.Vector3(-8, 1, -6), new THREE.Vector3(-15, 7, -22), OZ.yellow);
-createBridge(new THREE.Vector3(8, 1, 6), new THREE.Vector3(18, -2, 11), OZ.green);
-createBridge(new THREE.Vector3(0, 1, -8), new THREE.Vector3(0, 11, -30), OZ.purple);
-createBridge(new THREE.Vector3(-12, 1, 2), new THREE.Vector3(-27, 4, 4), OZ.orange);
+shopGroup.position.y = 1;
+marketIslandGroup.add(shopGroup);
+
+// Grid on the island surface
+const marketGrid = new THREE.GridHelper(16, 16, 0xd8cba8, 0xe0d4b4);
+marketGrid.position.y = 0.76;
+marketIslandGroup.add(marketGrid);
+
+// Position the marketplace island — adjacent to main island, connected by a bridge
+marketIslandGroup.position.set(30, 0, 0);
+marketIslandGroup.userData = { baseY: 0 };
+scene.add(marketIslandGroup);
+
+// Bridge from main island to marketplace
+const bridgeMid = new THREE.Vector3(15, 5, 0);
+const bridgeCurve = new THREE.QuadraticBezierCurve3(
+  new THREE.Vector3(12, 1, 0),
+  bridgeMid,
+  new THREE.Vector3(22, 1, 0),
+);
+const bridgeTube = new THREE.Mesh(
+  new THREE.TubeGeometry(bridgeCurve, 48, 0.15, 8, false),
+  new THREE.MeshStandardMaterial({
+    color: OZ.yellow, emissive: OZ.yellow, emissiveIntensity: 0.3,
+    roughness: 0.3, metalness: 0.4, transparent: true, opacity: 0.9,
+  }),
+);
+scene.add(bridgeTube);
+
+// Voice navigation alias for the marketplace island
+// (added to voiceNavigator.nameAliases later via direct assignment)
 
 
 // ============================
@@ -4693,9 +4719,7 @@ function animate() {
 
   // --- Floating islands bob ---
   mainIslandGroup.position.y = Math.sin(t * 0.3) * 0.15;
-  subIslands.forEach((isl, i) => {
-    isl.position.y = (isl.userData?.baseY ?? 0) + Math.sin(t * 0.3 + i * 1.2) * 0.3;
-  });
+  marketIslandGroup.position.y = Math.sin(t * 0.3 + 1.5) * 0.2; // marketplace bobs gently
 
   // --- Monitor float ---
   monitorGroup.position.y = 12 + Math.sin(t * 0.4) * 0.15;
@@ -5229,6 +5253,10 @@ const voiceNavigator = {
     'ラウンジ': 'lounge', 'ソファ': 'lounge', 'lounge': 'lounge', 'sofa': 'lounge', '休憩': 'lounge',
     'ホーム': 'home', 'home': 'home', 'スタート': 'home', 'start': 'home',
 
+    // Marketplace island
+    'マーケット': 'market', 'マケプレ': 'market', 'market': 'market', 'marketplace': 'market',
+    'ショップ': 'market', 'shop': 'market', 'お店': 'market', 'スキル': 'market',
+
     // Islands by color / number
     'ピンク': 'island_0', 'pink': 'island_0', '通信': 'island_0', 'communication': 'island_0',
     'シアン': 'island_1', 'cyan': 'island_1', '開発': 'island_1', 'development': 'island_1', 'dev': 'island_1',
@@ -5273,6 +5301,7 @@ const voiceNavigator = {
       'board': new THREE.Vector3(-10, 4, 5),
       'lounge': new THREE.Vector3(9, 1.2, 6),
       'home': new THREE.Vector3(0, 1.2, 14),
+      'market': new THREE.Vector3(30, 2, 0),
     };
     if (landmarks[key]) return { pos: landmarks[key].clone(), key };
 
