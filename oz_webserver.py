@@ -24,6 +24,7 @@ import subprocess
 import oz_economy
 import oz_network
 import oz_marketplace
+import oz_sessions
 import oz_agents_cli as oz_agents  # legacy alias — actual runtime via oz_agents_cli
 import oz_bidding
 import oz_external
@@ -212,6 +213,14 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(html)
+            return
+
+        # === Live agent sessions (read-only) ===
+        # Sessions live in oz_runtime's process (where ask_agent is called),
+        # so we have to query it via the unix socket.
+        if self.path == "/api/sessions/active":
+            result = oz_runtime.call_runtime("sessions.list", {})
+            self._send_json(result)
             return
 
         # === Marketplace (read-only) ===

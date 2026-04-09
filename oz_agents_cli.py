@@ -29,6 +29,7 @@ from typing import Optional
 
 import oz_economy
 import oz_vault
+import oz_sessions
 
 
 # ================================
@@ -212,6 +213,10 @@ def ask_agent(
             "needed": base_cost,
         }
 
+    # Register this session in the live registry so the 3D world can spawn
+    # an avatar for it. mark_done is called below after the call returns.
+    session = oz_sessions.register(agent, user_message)
+
     # Build context from vault
     context = ""
     if use_vault:
@@ -239,6 +244,7 @@ def ask_agent(
         user_message,
     ]
 
+    oz_sessions.mark_working(session.id)
     started = time.time()
     try:
         result = subprocess.run(
@@ -250,18 +256,22 @@ def ask_agent(
             env={**os.environ, "TERM": "dumb"},  # disable color codes
         )
     except subprocess.TimeoutExpired:
+        oz_sessions.mark_failed(session.id, "timeout")
         return {"ok": False, "error": "claude timed out", "reason": "timeout"}
     except FileNotFoundError:
+        oz_sessions.mark_failed(session.id, "cli not found")
         return {"ok": False, "error": "claude CLI not found", "reason": "cli_missing"}
 
     elapsed = time.time() - started
 
     if result.returncode != 0:
         err = (result.stderr or "claude failed").strip()
+        oz_sessions.mark_failed(session.id, err[:80])
         return {"ok": False, "error": err[:300], "reason": "claude_error"}
 
     reply = result.stdout.strip()
     if not reply:
+        oz_sessions.mark_failed(session.id, "empty response")
         return {"ok": False, "error": "empty response", "reason": "empty_response"}
 
     # Charge OZC
@@ -270,10 +280,14 @@ def ask_agent(
         cost_charged = tx["amount"]
         balance_after = tx["from_balance_after"]
     except ValueError as e:
+        oz_sessions.mark_failed(session.id, "charge failed")
         return {"ok": False, "error": str(e), "reason": "charge_failed"}
     except Exception:
         cost_charged = base_cost
         balance_after = oz_economy.get_balance(agent)
+
+    # Mark the session done so the 3D world shows the completion + reply
+    oz_sessions.mark_done(session.id, reply, cost_charged)
 
     # Write to vault for future reference
     try:

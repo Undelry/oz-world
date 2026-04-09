@@ -263,6 +263,12 @@ def _handle_macos_quit(params: dict) -> dict:
     return oz_macos.quit_app(app_name)
 
 
+def _handle_sessions_list(params: dict) -> dict:
+    """Return all live agent sessions for the 3D world to render."""
+    import oz_sessions
+    return {"ok": True, "sessions": oz_sessions.list_active()}
+
+
 def _handle_caps_list(params: dict) -> dict:
     return {
         "ok": True,
@@ -294,6 +300,7 @@ HANDLERS = {
     "caps.list":       _handle_caps_list,
     "approvals.list":  _handle_approvals_list,
     "approvals.resolve": _handle_approvals_resolve,
+    "sessions.list":   _handle_sessions_list,
     # macOS bridge
     "macos.list":      _handle_macos_list,
     "macos.running":   _handle_macos_running,
