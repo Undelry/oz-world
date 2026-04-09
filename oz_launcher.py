@@ -320,13 +320,7 @@ def verify_oz_launch():
     # 4. Arcブラウザでページが表示されているか確認（screencapture）
     screenshot_path = os.path.join(WORKSPACE, "hitomi_screenshot.png")
     try:
-        # Arcを前面に持ってきてスクリーンショット
-        subprocess.run(
-            ["osascript", "-e", 'tell application "Arc" to activate'],
-            capture_output=True, timeout=5,
-        )
-        time.sleep(1)
-
+        # Non-invasive screenshot — don't activate Arc (would steal user focus)
         result = subprocess.run(
             ["screencapture", "-x", screenshot_path],
             capture_output=True, timeout=10,

@@ -120,13 +120,15 @@ if [[ "$PAGE_TITLE" != *"OZ"* ]] && [[ "$PAGE_TITLE" != *"Virtual"* ]]; then
 fi
 
 # Make absolutely sure Arc is at the front
-osascript -e 'tell application "Arc" to activate' > /dev/null
+# NOTE: We no longer activate Arc — agent work must not steal focus.
+# The recording uses ffmpeg avfoundation which captures any display
+# regardless of which app is in front.
 sleep 0.5
 
 # Get Arc WebView position+size via Accessibility (AXSplitGroup is the web area).
 # Search ALL windows (not just front) since the OZ tab may not be in window 1.
 WEBVIEW_INFO=$(osascript << 'OSAEOF' 2>/dev/null
-tell application "Arc" to activate
+# Arc activation removed — we don't steal focus
 delay 0.5
 tell application "System Events"
     tell process "Arc"
@@ -184,7 +186,9 @@ CROP_H=$(( (CROP_H / 2) * 2 ))
 echo "  Crop region (device px): ${CROP_W}x${CROP_H}+${CROP_X}+${CROP_Y}"
 
 # Make absolutely sure Arc is at the front
-osascript -e 'tell application "Arc" to activate' > /dev/null
+# NOTE: We no longer activate Arc — agent work must not steal focus.
+# The recording uses ffmpeg avfoundation which captures any display
+# regardless of which app is in front.
 sleep 1.5
 
 VIDEO_FILE="$AUDIO_DIR/screen.mp4"

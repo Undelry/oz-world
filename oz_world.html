@@ -4604,7 +4604,6 @@ function animate() {
     if (cameraMode === 'firstPerson') {
       const headY = joeState.y + 2.5;
       camera.position.set(joeState.x, headY, joeState.z);
-      // Look direction from yaw/pitch
       const lookDir = new THREE.Vector3(
         Math.sin(fpYaw) * Math.cos(fpPitch),
         Math.sin(fpPitch),
@@ -4615,10 +4614,36 @@ function animate() {
         headY + lookDir.y * 10,
         joeState.z + lookDir.z * 10,
       );
-      // Hide Joe's avatar in first-person
       joeGroup.visible = false;
     } else {
       joeGroup.visible = true;
+
+      // === Orbital mode: camera follows Joe smoothly (game-style) ===
+      // Only follow when NOT tweening (voice navigation) — let flyTo do its thing
+      if (!voiceNavigator.tweening) {
+        // Target = Joe's head area
+        const targetPos = new THREE.Vector3(joeState.x, joeState.y + 2.5, joeState.z);
+
+        // Smooth follow — lerp the controls.target toward Joe
+        // 0.08 = soft spring; higher = snappier tracking
+        controls.target.lerp(targetPos, 0.08);
+
+        // Camera offset: maintain the current offset vector so the user's
+        // manual orbit/zoom angle is preserved, but the whole rig slides
+        // to keep Joe in view. We do this by also lerping camera.position
+        // by the same amount that controls.target moved.
+        const offset = camera.position.clone().sub(controls.target);
+        // Clamp the offset distance so it doesn't grow unbounded when
+        // controls.target is moving fast
+        const dist = offset.length();
+        if (dist > controls.maxDistance) {
+          offset.setLength(controls.maxDistance);
+        }
+        if (dist < controls.minDistance) {
+          offset.setLength(controls.minDistance);
+        }
+        camera.position.copy(controls.target).add(offset);
+      }
     }
   }
 
