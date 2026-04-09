@@ -4369,8 +4369,19 @@ function switchToOrbital() {
 // ============================
 const keys = {};
 window.addEventListener('keydown', (e) => {
-  // Skip game keys when voice panel is open (except T and Escape)
-  if (voiceController && voiceController.panelOpen && e.key !== 'Escape' && e.key !== 't' && e.key !== 'T') return;
+  // Skip game keys when voice panel is open (except special keys)
+  if (voiceController && voiceController.panelOpen) {
+    const allowed = ['Escape', 't', 'T'];
+    if (!allowed.includes(e.key)) return;
+  }
+  // Skip game keys when marketplace/auction modal is open
+  if (document.querySelector('#marketplaceModal.show, #auctionModal.show, #storeModal.show')) {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('#marketplaceModal, #auctionModal, #storeModal').forEach(m => m.classList.remove('show'));
+      return;
+    }
+    return; // don't process game keys while modal is open
+  }
   // Skip game keys when the dialog Claude input is focused
   if (document.activeElement && document.activeElement.id === 'dialogAskInput') return;
   keys[e.key.toLowerCase()] = true;

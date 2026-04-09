@@ -99,16 +99,28 @@ def should_stop() -> bool:
 # Cost guard
 # ================================
 def total_spent_in_window(start_ts: float) -> float:
-    """Sum of all OZC spent since the loop started."""
+    """
+    Sum of real resource consumption OZC since the loop started.
+    Uses a direct SQL query instead of get_ledger to avoid the 10K limit
+    and to properly filter out internal economy moves.
+    """
     try:
-        ledger = oz_economy.get_ledger(limit=10000)
+        import sqlite3
+        uri = f"file:{oz_economy.DB_PATH}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True, timeout=2)
+        cur = conn.cursor()
+        exempt = ("topup", "auto.topup", "auction.win", "task.assign", "task.report")
+        placeholders = ",".join("?" * len(exempt))
+        cur.execute(
+            f"SELECT COALESCE(SUM(amount), 0) FROM ledger "
+            f"WHERE ts >= ? AND action NOT IN ({placeholders})",
+            (start_ts, *exempt),
+        )
+        spent = float(cur.fetchone()[0])
+        conn.close()
+        return spent
     except Exception:
         return 0
-    return sum(
-        float(tx["amount"]) for tx in ledger
-        if tx.get("ts", 0) >= start_ts
-        and tx.get("action") not in ("topup", "auto.topup")
-    )
 
 
 # ================================
