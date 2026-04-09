@@ -1,0 +1,38 @@
+{
+  "name": "OZ Coin",
+  "symbol": "OZC",
+  "description": "OZ Coin (OZC) is the native currency of OZ World - an AI-powered virtual metaverse where creators sing, build, and earn. Powered by Solana. Created by a 16-year-old solo developer to make creator economy accessible to everyone.",
+  "image": "https://raw.githubusercontent.com/Undelry/oz-world/main/token/ozc_logo.png",
+  "external_url": "https://github.com/Undelry/oz-world",
+  "attributes": [
+    {
+      "trait_type": "Network",
+      "value": "Solana"
+    },
+    {
+      "trait_type": "Token Standard",
+      "value": "SPL Token"
+    },
+    {
+      "trait_type": "Max Supply",
+      "value": "100,000,000"
+    },
+    {
+      "trait_type": "Creator",
+      "value": "Joe Maekawa"
+    },
+    {
+      "trait_type": "Launch Year",
+      "value": "2026"
+    }
+  ],
+  "properties": {
+    "files": [
+      {
+        "uri": "https://raw.githubusercontent.com/Undelry/oz-world/main/token/ozc_logo.png",
+        "type": "image/png"
+      }
+    ],
+    "category": "image"
+  }
+}

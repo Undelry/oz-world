@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bgGlow" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#e0efff" stop-opacity="1"/>
+      <stop offset="60%" stop-color="#f0e4ff" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="1"/>
+    </radialGradient>
+
+    <linearGradient id="rainbow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff1744"/>
+      <stop offset="14%" stop-color="#ff6d00"/>
+      <stop offset="28%" stop-color="#ffd600"/>
+      <stop offset="42%" stop-color="#00e676"/>
+      <stop offset="57%" stop-color="#00e5ff"/>
+      <stop offset="72%" stop-color="#2979ff"/>
+      <stop offset="86%" stop-color="#651fff"/>
+      <stop offset="100%" stop-color="#d500f9"/>
+    </linearGradient>
+
+    <linearGradient id="dotGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00e676"/>
+      <stop offset="100%" stop-color="#00e5ff"/>
+    </linearGradient>
+
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="5"/>
+      <feOffset dx="0" dy="4"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.22"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" fill="#ffffff"/>
+  <circle cx="256" cy="256" r="230" fill="url(#bgGlow)"/>
+
+  <!-- Sparkles -->
+  <g>
+    <circle cx="90" cy="110" r="5" fill="#ffd600"/>
+    <circle cx="420" cy="140" r="6" fill="#ff6d00"/>
+    <circle cx="100" cy="380" r="5" fill="#d500f9"/>
+    <circle cx="420" cy="390" r="5" fill="#00e5ff"/>
+    <circle cx="60" cy="250" r="4" fill="#00e676"/>
+    <circle cx="450" cy="260" r="4" fill="#ff1744"/>
+    <circle cx="150" cy="70" r="4" fill="#651fff"/>
+    <circle cx="360" cy="440" r="4" fill="#ffd600"/>
+    <circle cx="380" cy="80" r="4" fill="#d500f9"/>
+    <circle cx="130" cy="440" r="4" fill="#2979ff"/>
+  </g>
+
+  <!-- ===== O letter (big ring) ===== -->
+  <g filter="url(#softShadow)">
+    <circle cx="180" cy="256" r="88" fill="none" stroke="url(#rainbow)" stroke-width="38" stroke-linecap="round"/>
+  </g>
+
+  <!-- ===== Z letter (proper solid Z outline, no holes) ===== -->
+  <!-- Z outline going clockwise:
+       TL(280,172) → TR(410,172) → BR-top(410,218)
+       → diagonal-BR(350,294) → bottom-TR(410,294) → bottom-BR(410,340)
+       → BL(280,340) → bottom-TL(280,294) → diagonal-TL(340,218)
+       → top-BL(280,218) → back to TL
+  -->
+  <g filter="url(#softShadow)">
+    <path d="
+      M 280,172
+      L 410,172
+      L 410,218
+      L 340,294
+      L 410,294
+      L 410,340
+      L 280,340
+      L 280,294
+      L 350,218
+      L 280,218
+      Z
+    " fill="url(#rainbow)"/>
+  </g>
+
+  <!-- Accent dot in O center -->
+  <g filter="url(#softShadow)">
+    <circle cx="180" cy="256" r="16" fill="#ffffff"/>
+    <circle cx="180" cy="256" r="10" fill="url(#dotGrad)"/>
+  </g>
+
+  <ellipse cx="256" cy="475" rx="160" ry="9" fill="#b0d4f5" opacity="0.35"/>
+</svg>
