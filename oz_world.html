@@ -432,6 +432,115 @@
   }
   #voiceTextInput input:focus { border-color: #118ab2; }
 
+  /* === Marketplace Modal === */
+  #marketplaceModal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px;
+    max-height: 75vh;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(20px);
+    border-radius: 18px;
+    padding: 24px 28px;
+    z-index: 500;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.18);
+    border: 1px solid rgba(255, 209, 102, 0.5);
+    display: none;
+    overflow-y: auto;
+  }
+  #marketplaceModal.show { display: block; }
+  #marketplaceModal h3 {
+    font-size: 18px;
+    color: #333;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  #marketplaceModal h3::before { content: "🏪"; }
+  #marketplaceModal .market-sub {
+    font-size: 11px;
+    color: rgba(0,0,0,0.45);
+    margin-bottom: 16px;
+  }
+  .skill-card {
+    border: 1px solid rgba(0,0,0,0.06);
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    background: rgba(250, 250, 255, 0.5);
+    transition: all 0.2s;
+  }
+  .skill-card:hover {
+    border-color: #ffd166;
+    background: rgba(255, 248, 220, 0.4);
+  }
+  .skill-card .skill-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #333;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .skill-card .skill-author {
+    font-size: 10px;
+    color: rgba(0,0,0,0.4);
+    margin-top: 2px;
+  }
+  .skill-card .skill-desc {
+    font-size: 12px;
+    color: rgba(0,0,0,0.6);
+    margin-top: 6px;
+  }
+  .skill-card .skill-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+    font-size: 11px;
+    color: rgba(0,0,0,0.5);
+  }
+  .skill-card .skill-stars { color: #ffa040; font-weight: 600; }
+  .skill-card .skill-installs { color: #06d6a0; }
+  .skill-card .skill-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+  .skill-card button {
+    padding: 5px 12px;
+    border: none;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .skill-card button:hover { transform: translateY(-1px); }
+  .skill-rate-btn {
+    background: linear-gradient(135deg, #ffd166, #ff8a5c);
+    color: #fff;
+  }
+  .skill-install-btn {
+    background: rgba(6, 214, 160, 0.15);
+    color: #047857;
+  }
+
+  #marketplaceClose {
+    margin-top: 12px;
+    padding: 8px 18px;
+    background: rgba(0,0,0,0.05);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #555;
+  }
+
   /* === Approvals Panel === */
   #approvalsPanel {
     position: fixed;
@@ -1147,6 +1256,16 @@
 
 <!-- Approvals Panel — appears at top center when actions need user consent -->
 <div id="approvalsPanel"></div>
+
+<!-- Marketplace Modal -->
+<div id="marketplaceModal">
+  <h3>OZ Skill Marketplace</h3>
+  <div class="market-sub">エージェントが作ったスキルを評価して、作者にOZコインを送ろう</div>
+  <div id="marketplaceList"></div>
+  <div style="text-align:center; margin-top:14px;">
+    <button id="marketplaceClose">Close</button>
+  </div>
+</div>
 
 <!-- OZ Economy Panel -->
 <div id="economyPanel">
@@ -2864,6 +2983,128 @@ function escapeHtml(s) {
 }
 
 // ============================
+// Personal Network Map — Joe's contacts as 3D bubbles
+// ============================
+// One sphere per contact. Distance = inverse intimacy. Color = recency.
+// Hover/click → show info panel. Toggle visibility with U key.
+const networkNodes = [];   // {sprite, mesh, group, contact}
+let networkVisible = false;
+
+function spawnNetworkNode(contact) {
+  const group = new THREE.Group();
+
+  // Color by recency: red (active) → orange (warm) → blue (cold)
+  let color;
+  const lastIso = contact.last_contact_iso || "";
+  const lastDate = lastIso ? new Date(lastIso).getTime() : 0;
+  const daysAgo = lastDate ? (Date.now() - lastDate) / (86400 * 1000) : 999;
+  if (daysAgo < 7)        color = 0xff4d6d;   // red — active
+  else if (daysAgo < 30)  color = 0xffa040;   // orange — warm
+  else if (daysAgo < 90)  color = 0xffd166;   // yellow — recent
+  else                    color = 0x6d8eb0;   // blue — cold
+
+  // Bubble size = sqrt(messages_total) capped
+  const total = Math.max(1, contact.messages_total || 1);
+  const size = Math.min(2.0, 0.4 + Math.sqrt(total) * 0.06);
+
+  // Sphere
+  const mesh = new THREE.Mesh(
+    new THREE.SphereGeometry(size, 16, 16),
+    new THREE.MeshStandardMaterial({
+      color, emissive: color, emissiveIntensity: 0.5,
+      roughness: 0.3, metalness: 0.4,
+      transparent: true, opacity: 0.85,
+    }),
+  );
+  group.add(mesh);
+
+  // Label sprite
+  const canvas = document.createElement('canvas');
+  canvas.width = 256; canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(255,255,255,0.95)';
+  if (ctx.roundRect) ctx.roundRect(4, 4, 248, 56, 12);
+  else ctx.rect(4, 4, 248, 56);
+  ctx.fill();
+  ctx.strokeStyle = '#' + color.toString(16).padStart(6, '0');
+  ctx.lineWidth = 2;
+  if (ctx.roundRect) ctx.roundRect(4, 4, 248, 56, 12);
+  else ctx.rect(4, 4, 248, 56);
+  ctx.stroke();
+
+  ctx.fillStyle = '#333';
+  ctx.font = 'bold 16px Inter, sans-serif';
+  ctx.textAlign = 'left';
+  const name = (contact.name || contact.handle || '?').slice(0, 18);
+  ctx.fillText(name, 12, 26);
+  ctx.fillStyle = 'rgba(0,0,0,0.5)';
+  ctx.font = '12px Inter, sans-serif';
+  ctx.fillText(`${total} msg`, 12, 48);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, transparent: true, opacity: 0.95,
+  }));
+  sprite.scale.set(3.2, 0.8, 1);
+  sprite.position.y = size + 0.8;
+  group.add(sprite);
+
+  const pos = contact.position || { x: 0, y: 0, z: 0 };
+  group.position.set(pos.x, pos.y, pos.z);
+  scene.add(group);
+
+  networkNodes.push({ group, mesh, sprite, contact });
+}
+
+function clearNetworkNodes() {
+  for (const n of networkNodes) {
+    scene.remove(n.group);
+  }
+  networkNodes.length = 0;
+}
+
+function showNetwork(snapshot) {
+  clearNetworkNodes();
+  const contacts = (snapshot && snapshot.contacts) || [];
+  contacts.forEach(c => spawnNetworkNode(c));
+  networkVisible = true;
+  showNotification(`Network: ${contacts.length} contacts loaded`);
+  ozSpeak(`${contacts.length}人のネットワークを表示しました`, 'Kyoko', 200, 'hitomi');
+}
+
+function hideNetwork() {
+  clearNetworkNodes();
+  networkVisible = false;
+}
+
+function loadNetworkSnapshot() {
+  fetch('/api/network/snapshot')
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok && data.snapshot) {
+        showNetwork(data.snapshot);
+      } else {
+        // No snapshot — refresh first
+        showNotification('Building network from Mail/Messages…');
+        fetch('/api/network/refresh', { method: 'POST' })
+          .then(r => r.json())
+          .then(() => fetch('/api/network/snapshot').then(r => r.json()))
+          .then(data => {
+            if (data.ok && data.snapshot) showNetwork(data.snapshot);
+            else showNotification('Network build failed');
+          });
+      }
+    })
+    .catch(() => showNotification('Network fetch error'));
+}
+
+function toggleNetwork() {
+  if (networkVisible) hideNetwork();
+  else loadNetworkSnapshot();
+}
+
+
+// ============================
 // External AI Marketplace — ghost agents at the edge of the world
 // ============================
 const externalProviders = []; // populated from /api/external/providers
@@ -3046,6 +3287,90 @@ document.getElementById('storeClose').addEventListener('click', closeStore);
 document.querySelectorAll('.store-pkg').forEach(el => {
   el.addEventListener('click', () => purchasePackage(el.dataset.package));
 });
+
+
+// ============================
+// Marketplace UI
+// ============================
+function openMarketplace() {
+  document.getElementById('marketplaceModal').classList.add('show');
+  fetch('/api/marketplace/list?sort=popular')
+    .then(r => r.json())
+    .then(data => {
+      const list = document.getElementById('marketplaceList');
+      const skills = (data && data.skills) || [];
+      if (skills.length === 0) {
+        list.innerHTML = '<div style="text-align:center;padding:20px;color:rgba(0,0,0,0.4);">No skills yet</div>';
+        return;
+      }
+      list.innerHTML = skills.map(s => {
+        const id = escapeHtml(s.id);
+        const name = escapeHtml(s.name);
+        const author = escapeHtml(s.author);
+        const desc = escapeHtml(s.description || '');
+        const stars = '★'.repeat(Math.round(s.avg_rating)) + '☆'.repeat(5 - Math.round(s.avg_rating));
+        const tags = (s.tags || []).map(t => `<span style="font-size:9px;padding:2px 6px;background:rgba(0,0,0,0.05);border-radius:4px;margin-right:4px;">${escapeHtml(t)}</span>`).join('');
+        return `<div class="skill-card" data-id="${id}">
+          <div class="skill-name">${name}</div>
+          <div class="skill-author">by ${author}</div>
+          <div class="skill-desc">${desc}</div>
+          <div class="skill-meta">
+            <span class="skill-stars">${stars} ${s.rating_count} reviews</span>
+            <span class="skill-installs">↓ ${s.install_count} installs</span>
+            <span>${s.price_ozc > 0 ? `🪙 ${s.price_ozc} OZC` : 'Free'}</span>
+          </div>
+          <div style="margin-top:6px;">${tags}</div>
+          <div class="skill-actions">
+            <button class="skill-install-btn" data-action="install" data-id="${id}">Install</button>
+            <button class="skill-rate-btn" data-action="rate" data-id="${id}" data-stars="5">★★★★★</button>
+            <button class="skill-rate-btn" data-action="rate" data-id="${id}" data-stars="4" style="opacity:0.85;">★★★★☆</button>
+          </div>
+        </div>`;
+      }).join('');
+      // Bind handlers
+      list.querySelectorAll('button[data-action]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const action = btn.dataset.action;
+          const id = btn.dataset.id;
+          if (action === 'install') {
+            fetch('/api/marketplace/install', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ skill_id: id }),
+            }).then(r => r.json()).then(data => {
+              if (data.ok) {
+                showNotification(`✅ Installed`);
+                openMarketplace();
+              } else {
+                showNotification(`Install failed: ${data.error}`);
+              }
+            });
+          } else if (action === 'rate') {
+            const stars = parseInt(btn.dataset.stars);
+            fetch('/api/marketplace/rate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ skill_id: id, rater: 'human', stars }),
+            }).then(r => r.json()).then(data => {
+              if (data.ok) {
+                showNotification(`✨ Rated ${stars}★ — author got ${data.reward_ozc} OZC`);
+                openMarketplace();
+              } else {
+                showNotification(`Rating failed: ${data.error}`);
+              }
+            });
+          }
+        });
+      });
+    })
+    .catch(() => {
+      document.getElementById('marketplaceList').innerHTML = '<div style="color:#ff4d6d;padding:20px;">Load error</div>';
+    });
+}
+function closeMarketplace() {
+  document.getElementById('marketplaceModal').classList.remove('show');
+}
+document.getElementById('marketplaceClose').addEventListener('click', closeMarketplace);
 
 
 // ============================
@@ -4090,6 +4415,20 @@ window.addEventListener('keydown', (e) => {
   if ((e.key === 'b' || e.key === 'B') && !e.repeat) {
     e.preventDefault();
     openAuction();
+    return;
+  }
+
+  // U key — toggle personal network map
+  if ((e.key === 'u' || e.key === 'U') && !e.repeat) {
+    e.preventDefault();
+    if (typeof toggleNetwork === 'function') toggleNetwork();
+    return;
+  }
+
+  // K key — open marketplace (for "skills")
+  if ((e.key === 'k' || e.key === 'K') && !e.repeat) {
+    e.preventDefault();
+    if (typeof openMarketplace === 'function') openMarketplace();
     return;
   }
 

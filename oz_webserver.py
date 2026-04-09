@@ -22,7 +22,9 @@ import threading
 import subprocess
 
 import oz_economy
-import oz_agents
+import oz_network
+import oz_marketplace
+import oz_agents_cli as oz_agents  # legacy alias — actual runtime via oz_agents_cli
 import oz_bidding
 import oz_external
 import oz_runtime
@@ -212,6 +214,42 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
             self.wfile.write(html)
             return
 
+        # === Marketplace (read-only) ===
+        if self.path == "/api/marketplace/list" or self.path.startswith("/api/marketplace/list?"):
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(self.path).query)
+            tag = qs.get("tag", [None])[0]
+            sort = qs.get("sort", ["popular"])[0]
+            try:
+                skills = oz_marketplace.list_skills(tag=tag, sort=sort, limit=50)
+                self._send_json({"ok": True, "skills": skills})
+            except Exception as e:
+                print(f"  /api/marketplace/list error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
+            return
+
+        if self.path.startswith("/api/marketplace/get/"):
+            skill_id = self.path.split("/")[-1]
+            try:
+                skill = oz_marketplace.get_skill(skill_id)
+                if skill is None:
+                    self._send_json({"ok": False, "error": "not found"}, status=404)
+                else:
+                    self._send_json({"ok": True, "skill": skill})
+            except Exception as e:
+                print(f"  /api/marketplace/get error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
+            return
+
+        # === Personal network map (read-only) ===
+        if self.path == "/api/network/snapshot":
+            snap = oz_network.load_snapshot()
+            if snap is None:
+                self._send_json({"ok": False, "error": "no snapshot — POST /api/network/refresh"}, status=404)
+            else:
+                self._send_json({"ok": True, "snapshot": snap})
+            return
+
         # === macOS bridge (read-only GETs) ===
         if self.path == "/api/macos/installed":
             self._send_json(oz_runtime.call_runtime("macos.list", {}))
@@ -286,6 +324,69 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json(result)
             except Exception as e:
                 print(f"  /api/speak error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
+            return
+
+        # === Marketplace POST endpoints ===
+        if self.path == "/api/marketplace/rate":
+            body = self._read_body()
+            if body is None:
+                return
+            try:
+                data = json.loads(body)
+                result = oz_marketplace.rate_skill(
+                    str(data.get("skill_id", ""))[:32],
+                    str(data.get("rater", "human"))[:64],
+                    int(data.get("stars", 0)),
+                    str(data.get("comment", ""))[:500],
+                )
+                self._send_json(result)
+            except Exception as e:
+                print(f"  /api/marketplace/rate error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
+            return
+
+        if self.path == "/api/marketplace/install":
+            body = self._read_body()
+            if body is None:
+                return
+            try:
+                data = json.loads(body)
+                result = oz_marketplace.install_skill(str(data.get("skill_id", ""))[:32])
+                self._send_json(result)
+            except Exception as e:
+                print(f"  /api/marketplace/install error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
+            return
+
+        if self.path == "/api/marketplace/publish":
+            body = self._read_body()
+            if body is None:
+                return
+            try:
+                data = json.loads(body)
+                result = oz_marketplace.publish(
+                    name=str(data.get("name", ""))[:80],
+                    description=str(data.get("description", ""))[:300],
+                    body=str(data.get("body", ""))[:50000],
+                    author=str(data.get("author", "human"))[:64],
+                    tags=data.get("tags") if isinstance(data.get("tags"), list) else None,
+                    price_ozc=float(data.get("price_ozc", 0)),
+                )
+                self._send_json(result)
+            except Exception as e:
+                print(f"  /api/marketplace/publish error: {e}")
+                self._send_json({"ok": False, "error": "internal error"}, status=500)
+            return
+
+        # === Personal network map: refresh ===
+        if self.path == "/api/network/refresh":
+            try:
+                snap = oz_network.build_network(limit=60, with_names=False, max_mail_files=10000)
+                oz_network.save_snapshot(snap)
+                self._send_json({"ok": True, "stats": snap.get("stats", {})})
+            except Exception as e:
+                print(f"  /api/network/refresh error: {e}")
                 self._send_json({"ok": False, "error": "internal error"}, status=500)
             return
 
