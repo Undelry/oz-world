@@ -191,7 +191,11 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
         # Inject the OZ token into the HTML at request time so that:
         # 1) the token never sits in a static file on disk
         # 2) only loopback requests get it (we already bind to 127.0.0.1)
-        if self.path == "/oz_world.html" or self.path == "/" or self.path == "":
+        # Strip query string for comparison so cache-busted URLs still get the
+        # token-injected HTML response
+        from urllib.parse import urlparse as _u
+        _p = _u(self.path).path
+        if _p == "/oz_world.html" or _p == "/" or _p == "":
             html_path = os.path.join(DIRECTORY, "oz_world.html")
             try:
                 with open(html_path, "rb") as f:
@@ -202,8 +206,16 @@ class OZHandler(http.server.SimpleHTTPRequestHandler):
             meta = (
                 '<meta name="oz-token" content="' + OZ_TOKEN + '">'
             ).encode("utf-8")
-            # Inject right after <head> if present, otherwise at the start
-            if b"<head>" in html:
+            # Inject AFTER <meta charset=...> so the browser sees charset
+            # in the first 1024 bytes (HTML5 spec) and parses correctly.
+            charset_marker = b'<meta charset="UTF-8">'
+            if charset_marker in html:
+                html = html.replace(
+                    charset_marker,
+                    charset_marker + b"\n" + meta,
+                    1,
+                )
+            elif b"<head>" in html:
                 html = html.replace(b"<head>", b"<head>\n" + meta, 1)
             else:
                 html = meta + html

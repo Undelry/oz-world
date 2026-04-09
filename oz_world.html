@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>
   // Early error capture so we can see ESM module errors via JS query
   window.__ozErrors = [];
@@ -18,9 +20,15 @@
     });
   });
 </script>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OZ — Virtual World</title>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+  }
+}
+</script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -1395,18 +1403,15 @@
 <!-- Three.js Container -->
 <div id="three-container"></div>
 
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
-  }
-}
-</script>
+<!-- importmap moved to <head> so it's parsed before any module script -->
 
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// Diagnostic markers — these only execute if imports succeeded
+window.__ozModuleEntered = true;
+window.__ozImportsOk = true;
 
 // ============================
 // OZ World — Summer Wars Style
@@ -5744,13 +5749,19 @@ function ozTransfer(fromAgent, toAgent, amount, action, detail = '') {
 
 
 // --- Start ---
+window.__ozStartReached = true;  // diagnostic marker
 setTimeout(() => {
   document.getElementById('loading').classList.add('hidden');
   setTimeout(() => document.getElementById('loading').style.display = 'none', 800);
 }, 1500);
 
 connectWS();
-animate();
+try {
+  animate();
+  window.__ozAnimateStarted = true;
+} catch(e) {
+  window.__ozAnimateError = e.message + '\n' + e.stack;
+}
 
 
 // ============================
