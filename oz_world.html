@@ -1232,7 +1232,7 @@
   <span class="ctrl-key">W A S D</span><span class="ctrl-label">Move</span>
   <span class="ctrl-key">Q / Shift</span><span class="ctrl-label">Up/Down</span>
   <span class="ctrl-key">Mouse</span><span class="ctrl-label">Look</span>
-  <span class="ctrl-key">V</span><span class="ctrl-label">1st/3rd Person</span>
+  <span class="ctrl-key">V</span><span class="ctrl-label">Camera (3rd→Front→1st)</span>
   <span class="ctrl-key">Space</span><span class="ctrl-label">Jump</span>
   <span class="ctrl-key">E</span><span class="ctrl-label">Talk</span>
   <span class="ctrl-key">T</span><span class="ctrl-label">Voice</span>
@@ -1451,6 +1451,8 @@ renderer.toneMappingExposure = 1.6;
 document.getElementById('three-container').appendChild(renderer.domElement);
 
 // --- Controls ---
+// OrbitControls kept for voice navigation tweens, but disabled for normal gameplay.
+// Our custom camera system (Minecraft-style 3 modes) handles all camera logic.
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
@@ -1458,7 +1460,10 @@ controls.minDistance = 5;
 controls.maxDistance = 150;
 controls.maxPolarAngle = Math.PI * 0.85;
 controls.target.set(0, 5, 0);
-camera.position.set(0, 18, 40);
+controls.enabled = false; // disabled by default — we manage camera ourselves
+
+// Initial camera position: behind Joe at spawn
+camera.position.set(0, 8, 26);
 
 // --- Pure White Background ---
 const bgCanvas = document.createElement('canvas');
@@ -2289,10 +2294,20 @@ const joeState = {
   freeY: true,     // Y軸自由移動モード
 };
 
-// Camera mode: 'orbital' or 'firstPerson'
-let cameraMode = 'orbital';
-let fpYaw = 0, fpPitch = 0;
+// Camera modes (Minecraft-style cycle: V key)
+//   'thirdBack'  — behind Joe, looking forward (default, game-feel)
+//   'thirdFront' — in front of Joe, looking back at him
+//   'firstPerson'— Joe's eyes, avatar hidden
+const CAMERA_MODES = ['thirdBack', 'thirdFront', 'firstPerson'];
+let cameraMode = 'thirdBack';
+let fpYaw = Math.PI, fpPitch = 0;  // initial: looking toward hitomi tower (-Z)
 let pointerLocked = false;
+
+// Third-person camera config
+const TP_DISTANCE = 12;    // distance behind/in front of Joe
+const TP_HEIGHT = 6;       // how far above Joe
+const TP_LOOK_HEIGHT = 2;  // look at Joe's head area
+const TP_SMOOTHING = 0.1;  // 0 = instant, 1 = frozen. 0.1 = nice spring
 
 
 // ============================
@@ -4330,38 +4345,45 @@ updateClock();
 // ============================
 // Camera Mode Helpers
 // ============================
-function switchToFirstPerson() {
-  cameraMode = 'firstPerson';
-  controls.enabled = false;
-  // Calculate initial yaw from current camera direction
-  const dir = new THREE.Vector3();
-  camera.getWorldDirection(dir);
-  fpYaw = Math.atan2(dir.x, dir.z);
-  fpPitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
-  // Request pointer lock — handle failure gracefully
-  try {
-    const lockPromise = renderer.domElement.requestPointerLock();
-    if (lockPromise && lockPromise.catch) {
-      lockPromise.catch(() => {
-        // Pointer lock denied — still allow first-person via mouse click
-      });
+function switchCameraMode(mode) {
+  cameraMode = mode;
+
+  if (mode === 'firstPerson') {
+    controls.enabled = false;
+    // Initialize yaw/pitch from current camera direction
+    const dir = new THREE.Vector3();
+    camera.getWorldDirection(dir);
+    fpYaw = Math.atan2(dir.x, dir.z);
+    fpPitch = Math.asin(Math.max(-1, Math.min(1, dir.y)));
+    joeGroup.visible = false;
+    try {
+      const p = renderer.domElement.requestPointerLock();
+      if (p && p.catch) p.catch(() => {});
+    } catch(e) {}
+    showNotification('🎮 First Person — press V to switch');
+  } else {
+    // Both thirdBack and thirdFront use OrbitControls disabled
+    // because we manage the camera position ourselves
+    controls.enabled = false;
+    joeGroup.visible = true;
+    if (document.pointerLockElement) {
+      try { document.exitPointerLock(); } catch(e) {}
     }
-  } catch(e) {}
-  showNotification('1st Person View — Press V or Esc to return');
+    // Initialize yaw from current camera direction
+    const dir = camera.position.clone().sub(new THREE.Vector3(joeState.x, joeState.y, joeState.z));
+    fpYaw = Math.atan2(dir.x, dir.z);
+    fpPitch = 0;
+    if (mode === 'thirdBack') {
+      showNotification('🎮 Third Person (Back) — press V to switch');
+    } else {
+      showNotification('🎮 Third Person (Front) — press V to switch');
+    }
+  }
 }
 
-function switchToOrbital() {
-  cameraMode = 'orbital';
-  controls.enabled = true;
-  controls.target.set(joeState.x, joeState.y + 3, joeState.z);
-  camera.position.set(joeState.x, joeState.y + 8, joeState.z + 15);
-  joeGroup.visible = true;
-  // Exit pointer lock
-  if (document.pointerLockElement) {
-    try { document.exitPointerLock(); } catch(e) {}
-  }
-  showNotification('Orbital View');
-}
+// Legacy aliases for voice navigation and other code that calls these
+function switchToFirstPerson() { switchCameraMode('firstPerson'); }
+function switchToOrbital() { switchCameraMode('thirdBack'); }
 
 
 // ============================
@@ -4404,21 +4426,19 @@ window.addEventListener('keydown', (e) => {
     }
   }
 
-  // V key — toggle first-person / orbital view
+  // V key — cycle camera modes (Minecraft-style: back → front → first person → back)
   if (e.key === 'v' || e.key === 'V') {
-    if (cameraMode === 'orbital') {
-      switchToFirstPerson();
-    } else {
-      switchToOrbital();
-    }
+    const idx = CAMERA_MODES.indexOf(cameraMode);
+    const next = CAMERA_MODES[(idx + 1) % CAMERA_MODES.length];
+    switchCameraMode(next);
   }
 
-  // Escape exits first-person mode or closes text input
+  // Escape — close panels or exit first-person
   if (e.key === 'Escape') {
     if (voiceController && voiceController.textInputVisible) {
       voiceController.hideTextInput();
     } else if (cameraMode === 'firstPerson') {
-      switchToOrbital();
+      switchCameraMode('thirdBack');
     }
   }
 
@@ -4471,28 +4491,27 @@ window.addEventListener('keydown', (e) => {
 });
 window.addEventListener('keyup', (e) => keys[e.key.toLowerCase()] = false);
 
-// Pointer lock for first-person mouse look
+// Pointer lock for mouse look (first person + third person orbit)
 document.addEventListener('pointerlockchange', () => {
   pointerLocked = !!document.pointerLockElement;
-  // If pointer lock was released while in first-person (e.g. browser Esc), switch back
   if (!pointerLocked && cameraMode === 'firstPerson') {
-    switchToOrbital();
+    switchCameraMode('thirdBack');
   }
 });
 
 renderer.domElement.addEventListener('click', () => {
-  if (cameraMode === 'firstPerson' && !pointerLocked) {
+  // Click to grab mouse in first person, or to enable drag-orbit in third person
+  if (!pointerLocked) {
     renderer.domElement.requestPointerLock();
   }
 });
 
 document.addEventListener('mousemove', (e) => {
-  if (cameraMode === 'firstPerson' && pointerLocked) {
-    const sensitivity = 0.002;
-    fpYaw -= e.movementX * sensitivity;
-    fpPitch -= e.movementY * sensitivity;
-    fpPitch = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, fpPitch));
-  }
+  if (!pointerLocked) return;
+  const sensitivity = 0.002;
+  fpYaw -= e.movementX * sensitivity;
+  fpPitch -= e.movementY * sensitivity;
+  fpPitch = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, fpPitch));
 });
 
 // Click to dismiss dialog
@@ -4541,19 +4560,11 @@ function animate() {
   // --- Joe Movement (WASD + Q/Shift for Y-axis) ---
   if (!dialogActive) {
     const moveSpeed = joeState.speed;
-    let camDir, camRight;
 
-    if (cameraMode === 'firstPerson') {
-      // First-person: direction from yaw
-      camDir = new THREE.Vector3(Math.sin(fpYaw), 0, Math.cos(fpYaw));
-      camRight = new THREE.Vector3(Math.sin(fpYaw + Math.PI / 2), 0, Math.cos(fpYaw + Math.PI / 2));
-    } else {
-      camDir = new THREE.Vector3();
-      camera.getWorldDirection(camDir);
-      camDir.y = 0;
-      camDir.normalize();
-      camRight = new THREE.Vector3().crossVectors(camDir, camera.up).normalize();
-    }
+    // Movement direction is always based on fpYaw (the camera's horizontal angle)
+    // This makes WASD feel consistent across all 3 camera modes
+    const camDir = new THREE.Vector3(Math.sin(fpYaw), 0, Math.cos(fpYaw));
+    const camRight = new THREE.Vector3(Math.sin(fpYaw + Math.PI / 2), 0, Math.cos(fpYaw + Math.PI / 2));
 
     let moving = false;
     if (keys['w'] || keys['arrowup'])    { joeState.x += camDir.x * moveSpeed; joeState.z += camDir.z * moveSpeed; moving = true; }
@@ -4600,8 +4611,12 @@ function animate() {
       }
     }
 
-    // First-person camera follows Joe's head
+    // === Camera system (Minecraft-style 3 modes) ===
+    const joeHeadPos = new THREE.Vector3(joeState.x, joeState.y + TP_LOOK_HEIGHT, joeState.z);
+
     if (cameraMode === 'firstPerson') {
+      // --- First Person: camera at Joe's eyes, avatar hidden ---
+      joeGroup.visible = false;
       const headY = joeState.y + 2.5;
       camera.position.set(joeState.x, headY, joeState.z);
       const lookDir = new THREE.Vector3(
@@ -4614,35 +4629,33 @@ function animate() {
         headY + lookDir.y * 10,
         joeState.z + lookDir.z * 10,
       );
-      joeGroup.visible = false;
-    } else {
+
+    } else if (cameraMode === 'thirdBack' || cameraMode === 'thirdFront') {
+      // --- Third Person: camera orbits Joe at fixed distance ---
       joeGroup.visible = true;
 
-      // === Orbital mode: camera follows Joe smoothly (game-style) ===
-      // Only follow when NOT tweening (voice navigation) — let flyTo do its thing
+      // When voice navigation is tweening, don't override
       if (!voiceNavigator.tweening) {
-        // Target = Joe's head area
-        const targetPos = new THREE.Vector3(joeState.x, joeState.y + 2.5, joeState.z);
+        // Direction the camera should be from Joe
+        const behind = (cameraMode === 'thirdBack') ? 1 : -1;
 
-        // Smooth follow — lerp the controls.target toward Joe
-        // 0.08 = soft spring; higher = snappier tracking
-        controls.target.lerp(targetPos, 0.08);
+        // Target camera position: behind (or in front of) Joe, offset by yaw
+        const desiredCamPos = new THREE.Vector3(
+          joeState.x - Math.sin(fpYaw) * TP_DISTANCE * behind,
+          joeState.y + TP_HEIGHT + Math.sin(fpPitch) * TP_DISTANCE * 0.5,
+          joeState.z - Math.cos(fpYaw) * TP_DISTANCE * behind,
+        );
 
-        // Camera offset: maintain the current offset vector so the user's
-        // manual orbit/zoom angle is preserved, but the whole rig slides
-        // to keep Joe in view. We do this by also lerping camera.position
-        // by the same amount that controls.target moved.
-        const offset = camera.position.clone().sub(controls.target);
-        // Clamp the offset distance so it doesn't grow unbounded when
-        // controls.target is moving fast
-        const dist = offset.length();
-        if (dist > controls.maxDistance) {
-          offset.setLength(controls.maxDistance);
-        }
-        if (dist < controls.minDistance) {
-          offset.setLength(controls.minDistance);
-        }
-        camera.position.copy(controls.target).add(offset);
+        // Smooth spring toward desired position
+        camera.position.lerp(desiredCamPos, TP_SMOOTHING);
+
+        // Always look at Joe's head
+        camera.lookAt(joeHeadPos);
+      }
+
+      // Joe faces the direction of the camera yaw (only in thirdBack)
+      if (cameraMode === 'thirdBack' && !moving) {
+        // Don't override rotation while moving — that's handled by WASD code above
       }
     }
   }
@@ -4834,7 +4847,15 @@ function animate() {
   // --- Voice navigator camera tween ---
   voiceNavigator.update();
 
-  controls.update();
+  // OrbitControls is disabled in our custom camera system.
+  // We only call controls.update() during voice navigation tweens
+  // where we still use controls.target for the lerp math.
+  if (voiceNavigator.tweening) {
+    controls.enabled = true;
+    controls.update();
+    controls.enabled = false;
+  }
+
   renderer.render(scene, camera);
 }
 
