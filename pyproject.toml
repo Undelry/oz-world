@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ozc"
+version = "1.0.0"
+description = "OZC settlement protocol for AI agent transactions: signed ledger, HTTP daemon, optional Solana bridge."
+readme = "OZC_PROTOCOL.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "OZ" },
+]
+keywords = ["ozc", "ai", "agents", "ledger", "ed25519", "solana", "settlement"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Security :: Cryptography",
+  "Topic :: Software Development :: Libraries",
+]
+
+# Mandatory deps. Identity needs cryptography for Ed25519; everything else
+# in the core (ledger, events, daemon) is stdlib only.
+dependencies = [
+  "cryptography>=42",
+]
+
+[project.optional-dependencies]
+# Pull these in for the read-only Solana bridge:
+#     pip install "ozc[onchain]"
+onchain = [
+  "httpx>=0.27",
+]
+
+# Convenience meta-extra for "everything":
+#     pip install "ozc[all]"
+all = [
+  "cryptography>=42",
+  "httpx>=0.27",
+]
+
+[project.urls]
+Documentation = "https://github.com/oz-no-sekai/ozc/blob/main/OZC_PROTOCOL.md"
+Source = "https://github.com/oz-no-sekai/ozc"
+
+[project.scripts]
+# `pip install ozc` exposes a top-level `ozc` command that maps to ozc.__main__
+ozc = "ozc.__main__:main"
+
+[tool.setuptools]
+# Only ship the ozc/ package — not the legacy oz_*.py shims, not the
+# OZ 3D viewer, not oz_webserver/runtime/etc. Shims live in the dev tree
+# only and exist purely for backward-compatible imports inside this repo.
+packages = ["ozc"]
+
+[tool.setuptools.package-data]
+ozc = ["py.typed"]

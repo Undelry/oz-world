@@ -6,6 +6,12 @@
 __pycache__/
 *.pyc
 
+# Python packaging build artifacts (`python3 -m build`)
+build/
+dist/
+*.egg-info/
+*.egg
+
 # IDE
 .claude/
 .vscode/
